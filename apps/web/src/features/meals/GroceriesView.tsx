@@ -72,16 +72,16 @@ export function GroceriesView({ menu }: { menu: MealMenu }) {
     );
   }
 
-  const list = (items: GroceryItem[]) => (
-    <ul className="divide-y divide-line">
+  const list = (items: GroceryItem[], className?: string) => (
+    <ul className={cn("divide-y divide-line", className)}>
       {items.map((g) => {
         const on = checked.has(g.item);
         const needed = usefulNeeded(g.needed);
         return (
-          <li key={g.item} className="py-3">
+          <li key={g.item} className="break-inside-avoid py-3">
             <Checkbox checked={on} onChange={(v) => toggle(g.item, v)}>
               <span className="flex items-start justify-between gap-4">
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span
                     className={cn(
                       "block text-[15px] leading-snug transition-colors",
@@ -92,7 +92,8 @@ export function GroceriesView({ menu }: { menu: MealMenu }) {
                   </span>
                   {needed && <span className="mt-0.5 block text-[13px] text-ink-3">Plan uses {needed}</span>}
                 </span>
-                <span className="shrink-0 text-right">
+                {/* Wraps instead of squeezing the name when a package label runs long. */}
+                <span className="max-w-[45%] text-right">
                   <span className={cn("tnum block text-[13px]", on ? "text-ink-3" : "text-ink-2")}>{g.quantity}</span>
                   <span className="tnum mt-0.5 block text-[13px] text-ink-3">{fmtUsd(g.costUsd)}</span>
                 </span>
@@ -144,7 +145,11 @@ export function GroceriesView({ menu }: { menu: MealMenu }) {
         <section className="mt-3 border-t border-line pt-7" aria-label="Check you have these">
           <h2 className="text-[15px] font-semibold text-ink">Check you have these</h2>
           <p className="mt-0.5 text-[13px] text-ink-3">Pantry staples, not in the total. Buy only if you're out.</p>
-          <div className="mt-2 md:columns-2 md:gap-10">{list(staples)}</div>
+          {/* Two independent lists rather than CSS columns, so no item or divider splits across columns. */}
+          <div className="mt-2 md:grid md:grid-cols-2 md:gap-x-10">
+            {list(staples.slice(0, Math.ceil(staples.length / 2)))}
+            {list(staples.slice(Math.ceil(staples.length / 2)), "border-t border-line md:border-t-0")}
+          </div>
         </section>
       )}
     </div>

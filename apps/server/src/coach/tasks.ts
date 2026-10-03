@@ -136,7 +136,7 @@ const CatalogOut = z.object({
   unit: z.enum(["g", "ml", "piece"]),
   pieceName: z.string().describe("For piece items, the plural noun for one unit (slices, cans, eggs); empty string otherwise"),
   packageSize: z.number().positive().describe("Size of the package you'd buy, in unit"),
-  packageLabel: z.string().describe("e.g. '32 oz tub', '3 lb family pack', 'dozen'"),
+  packageLabel: z.string().describe("Short: size and container only, e.g. '15 oz can', '32 oz tub', '3 lb family pack', 'dozen'. No notes or conversions."),
   packagePrice: z.number().describe("Typical US grocery price for one package, USD"),
   staple: z.boolean().describe("A pantry item most kitchens keep on hand: oil, spices, condiments, bulk rice or oats"),
 });
