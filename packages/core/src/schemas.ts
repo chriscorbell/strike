@@ -278,6 +278,10 @@ export const SessionExercise = z.object({
   prescriptionNote: z.string(),
   /** The heaviest available weight is still light for the rep range. */
   maxedOut: z.boolean(),
+  /** Every load available for this exercise at the session's location, ascending; empty for bodyweight. */
+  loadOptions: z.array(z.number()),
+  /** Suggested rest between sets: longer for compound lifts. */
+  restSeconds: z.number().int(),
   lastTime: z
     .object({
       date: LocalDate,

@@ -5,3 +5,5 @@ Durable workspace knowledge that is expensive to rediscover: hidden constraints,
 One bullet per topic note, with a relative link and a concrete "read when" cue. Create a note only for a supported finding; keep the facts in the note.
 
 Threshold: 12 entries. Past it, the bounded review in [maintenance](../maintenance.md) samples this category first.
+
+- [Server runtime and coach timing](runtime-and-coach.md): before changing server startup, the Dockerfile, or coach prompts/timeouts

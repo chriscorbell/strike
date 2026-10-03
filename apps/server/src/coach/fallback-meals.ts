@@ -212,7 +212,7 @@ export function fallbackOptions(profile: Profile, role: MealRole, target: Macros
     id: `${idPrefix}-o${i}`,
     kind: "out",
     name: o.name,
-    summary: `From ${o.place}.`,
+    summary: o.order.split(/[.:]/)[0]!,
     place: o.place,
     order: o.order,
     ingredients: [],

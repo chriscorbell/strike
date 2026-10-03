@@ -1,13 +1,10 @@
 // Pure helpers for the workout screen: ordering, set lookup, load stepping, formatting.
 import {
   getExercise,
-  loadOptions,
   round,
   type LoadType,
-  type LocationEquipment,
   type Muscle,
   type MuscleFeedback,
-  type Pattern,
   type Session,
   type SessionExercise,
 } from "@strike/core";
@@ -30,27 +27,6 @@ export interface SetRef {
 export const setKey = (ref: { seId: number; index: number }) => `${ref.seId}-${ref.index}`;
 
 export const orderedExercises = (s: Session): SessionExercise[] => [...s.exercises].sort((a, b) => a.order - b.order);
-
-const COMPOUND = new Set<Pattern>([
-  "horizontal_push",
-  "incline_push",
-  "vertical_push",
-  "dip",
-  "vertical_pull",
-  "horizontal_pull",
-  "squat",
-  "lunge",
-  "hinge",
-  "hip_thrust",
-]);
-
-export function isCompound(exerciseId: string): boolean {
-  const pattern = getExercise(exerciseId)?.pattern;
-  return pattern ? COMPOUND.has(pattern) : false;
-}
-
-/** Rest after a set: 2:00 for compounds, 1:30 for isolations. */
-export const restSecondsFor = (exerciseId: string) => (isCompound(exerciseId) ? 120 : 90);
 
 export const isLoaded = (se: SessionExercise) => se.loadType !== "bodyweight";
 
@@ -99,14 +75,11 @@ export function muscleBounds(exercises: SessionExercise[]) {
 export const feedbackFor = (s: Session, muscle: Muscle): MuscleFeedback | undefined =>
   s.feedback.find((f) => f.muscle === muscle);
 
-/** Every load you can set up for this exercise at this location; empty when unknown or bodyweight. */
-export function loadsFor(se: SessionExercise, equipment: LocationEquipment, unit: LoadUnit): number[] {
-  const exercise = getExercise(se.exerciseId);
-  if (!exercise || !isLoaded(se)) return [];
-  return loadOptions(exercise, equipment, unit);
-}
-
-/** Step to the next real load in a direction; falls back to 5 lb / 2.5 kg steps. Stays put at the ends. */
+/**
+ * Step through the loads the server says are available (`SessionExercise.loadOptions`): from any value,
+ * go to the nearest real load above or below it. With no options (bodyweight added load) it falls back
+ * to 5 lb / 2.5 kg steps. Stays put at the ends.
+ */
 export function loadStepFn(options: number[], unit: LoadUnit) {
   return (current: number, dir: 1 | -1): number => {
     if (options.length > 0) {
@@ -121,6 +94,12 @@ export function loadStepFn(options: number[], unit: LoadUnit) {
     const next = dir > 0 ? Math.floor(current / step + 1e-9) * step + step : Math.ceil(current / step - 1e-9) * step - step;
     return Math.max(0, round(next, 2));
   };
+}
+
+/** The available load closest to a value; the value itself when there are no options. */
+export function nearestLoad(value: number, options: number[]): number {
+  if (options.length === 0) return value;
+  return options.reduce((best, o) => (Math.abs(o - value) < Math.abs(best - value) ? o : best), options[0]!);
 }
 
 /** "50 lb × 11"; "11 reps" for bodyweight, or "BW + 25 lb × 8" with added load. */

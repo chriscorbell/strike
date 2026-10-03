@@ -1,0 +1,79 @@
+# Source of truth for Strike.xcodeproj. Regenerate with `xcodegen generate` from apps/ios.
+# Sources live in a synchronized folder, so new Swift files in Strike/ need no regeneration.
+name: Strike
+options:
+  bundleIdPrefix: cc.xode
+  deploymentTarget:
+    iOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    DEVELOPMENT_TEAM: M5MQ93V9V8
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ENABLE_PREVIEWS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+
+targets:
+  Strike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Strike
+        type: syncedFolder
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Strike
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSHealthShareUsageDescription: Strike reads your body weight from Apple Health so your weight trend stays current without typing it in.
+        NSHealthUpdateUsageDescription: Strike saves your finished lifting sessions to Apple Health as strength training workouts.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            ts.net:
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
+    entitlements:
+      path: Config/Strike.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cc.xode.strike
+        PRODUCT_NAME: Strike
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: Config/Strike.entitlements
+
+schemes:
+  Strike:
+    build:
+      targets:
+        Strike: all
+    run:
+      config: Debug
+    archive:
+      config: Release

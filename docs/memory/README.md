@@ -14,7 +14,11 @@ Read this index and [the protocol](protocol.md) when starting or resuming a sess
 
 ## Canonical project documents
 
-No canonical project documents exist yet. Add a pointer with a retrieval cue here when one is created (for example `README.md`, `CONTEXT.md`, `docs/adr/`, `docs/agents/`); their contents stay in their own locations.
+- [`README.md`](../../README.md): setup, configuration, deployment
+- [`CONTEXT.md`](../../CONTEXT.md): domain vocabulary (block, session, RIR, plan week, slot...)
+- [`docs/api.md`](../api.md): the HTTP API contract shared by server, web and iOS
+- [`docs/adr/`](../adr/): why rules decide numbers and Claude decides content, subscription auth, Tailscale-only deployment
+- [`apps/ios/README.md`](../../apps/ios/README.md): building and installing the iPhone app
 
 ## Review record
 

@@ -1,7 +1,7 @@
 // The deterministic mesocycle planner, used when the coach (Claude) is unavailable, and the validator
 // every coach-written plan passes through before it is stored.
 import type { Exercise, Pattern } from "./exercises.ts";
-import { EXERCISES, getExercise } from "./exercises.ts";
+import { EXERCISES, getExercise, isIsolation } from "./exercises.ts";
 import { availableExercises, isAvailable, loadOptions, snapDown } from "./equipment.ts";
 import { startingWeight } from "./progression.ts";
 import type { Location, LocationEquipment, MesoDayPlan, MesoExercisePlan, MesoPlan, Muscle, Profile } from "./schemas.ts";
@@ -83,7 +83,6 @@ const SPLITS: Record<number, { name: string; days: DayTemplate[] }> = {
   6: { name: "Push/pull/legs, 6 days", days: [PUSH, PULL, LEGS, PUSH_B, PULL_B, LEGS_B] },
 };
 
-const ISOLATION: Pattern[] = ["fly", "lateral_raise", "rear_delt", "curl", "triceps_extension", "forearm", "knee_extension", "knee_flexion", "calf_raise", "core", "front_raise", "shrug", "pullover"];
 
 function pick(slot: Slot, pool: Exercise[], usedToday: Set<string>, usedThisMeso: Set<string>): Exercise | undefined {
   const byMuscle = pool.filter((e) => e.primary === slot.muscle && !usedToday.has(e.id));
@@ -118,7 +117,7 @@ export function fallbackMeso(profile: Profile, bodyWeightKg: number, avoid: stri
       if (!e) continue;
       usedToday.add(e.id);
       usedThisMeso.add(e.id);
-      const isolation = ISOLATION.includes(e.pattern);
+      const isolation = isIsolation(e);
       const focus = profile.training.focusMuscles.includes(e.primary);
       const sets = Math.min(4, (isolation ? 2 : 3) + (focus ? 1 : 0));
       exercises.push({

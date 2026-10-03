@@ -14,6 +14,7 @@ import {
   isExerciseDone,
   isLoaded,
   loadStepFn,
+  nearestLoad,
   substitutedName,
   type SetRef,
 } from "./lib.ts";
@@ -21,7 +22,7 @@ import { SetRow, type Draft } from "./SetRow.tsx";
 import type { FeedbackChange } from "./useSessionActions.ts";
 
 /** What the editor starts with: the logged values, or the target with the last logged weight carried forward. */
-export function initialDraft(se: SessionExercise, index: number, sessionRir: number, loads: number[], carry?: number | null): Draft {
+export function initialDraft(se: SessionExercise, index: number, sessionRir: number, carry?: number | null): Draft {
   const set = se.sets[index];
   if (set?.log) return { weight: set.log.weight, reps: set.log.reps, rir: set.log.rir ?? set.targetRir };
   const template = set ?? se.sets[se.sets.length - 1];
@@ -34,9 +35,8 @@ export function initialDraft(se: SessionExercise, index: number, sessionRir: num
     ? (carry ??
       previous?.weight ??
       template?.targetWeight ??
-      se.lastTime?.sets.find((s) => s.weight != null)?.weight ??
-      loads[0] ??
-      0)
+      // No target yet: start from last time's load, snapped to what's available here.
+      nearestLoad(se.lastTime?.sets.find((s) => s.weight != null)?.weight ?? se.loadOptions[0] ?? 0, se.loadOptions))
     : carry !== undefined
       ? carry
       : (previous?.weight ?? template?.targetWeight ?? null);
@@ -47,7 +47,6 @@ export interface ExerciseCardProps {
   session: Session;
   exercise: SessionExercise;
   active: SetRef | null;
-  loads: number[];
   feedback: MuscleFeedback | undefined;
   askSoreness: boolean;
   askFeedback: boolean;
@@ -64,7 +63,6 @@ export function ExerciseCard({
   session,
   exercise: se,
   active,
-  loads,
   feedback,
   askSoreness,
   askFeedback,
@@ -80,7 +78,7 @@ export function ExerciseCard({
   const done = isExerciseDone(se);
   const anyLogged = se.sets.some((s) => s.log);
   const swappedFrom = substitutedName(se);
-  const stepLoad = loadStepFn(loads, unit);
+  const stepLoad = loadStepFn(se.loadOptions, unit);
   const perHand = se.loadType === "dumbbell";
   const activeHere = active?.seId === se.id ? active : null;
   const adding = activeHere != null && activeHere.index >= se.sets.length;
@@ -168,7 +166,7 @@ export function ExerciseCard({
               unit={unit}
               active={isActive}
               readOnly={false}
-              initial={initialDraft(se, index, session.targetRir, loads, isActive ? activeHere?.carry : undefined)}
+              initial={initialDraft(se, index, session.targetRir, isActive ? activeHere?.carry : undefined)}
               stepLoad={stepLoad}
               perHand={perHand}
               onSelect={() => onSelect({ seId: se.id, index, edit: !!set?.log })}

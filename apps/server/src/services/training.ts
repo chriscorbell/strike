@@ -11,6 +11,7 @@ import {
   maxSetsForMinutes,
   prescribe,
   requireExercise,
+  restSecondsFor,
   rirForWeek,
   setDelta,
   snapDown,
@@ -310,6 +311,8 @@ export function sessionView(id: number): Session {
         notes: se.notes,
         prescriptionNote: se.prescriptionNote,
         maxedOut: se.maxedOut,
+        loadOptions: loadOptions(ex, profile.equipment[row.location], loadUnit(profile.units)),
+        restSeconds: restSecondsFor(ex),
         substitutedFrom: se.substitutedFrom,
         lastTime: last ? { date: last.date, sets: last.sets.map((s) => ({ weight: s.weight, reps: s.reps, rir: s.rir })) } : null,
         sets: Array.from({ length: count }, (_, index) => {

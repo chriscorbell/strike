@@ -20,10 +20,8 @@ import {
   feedbackFor,
   firstUnlogged,
   isExerciseDone,
-  loadsFor,
   muscleBounds,
   orderedExercises,
-  restSecondsFor,
   setCounts,
   setKey,
   type SetRef,
@@ -62,11 +60,6 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
   const exercises = useMemo(() => orderedExercises(session), [session]);
   const { total, logged, remaining } = setCounts(exercises);
   const bounds = useMemo(() => muscleBounds(exercises), [exercises]);
-  const equipment = profile.equipment[session.location];
-  const loads = useMemo(
-    () => new Map(exercises.map((se) => [se.id, loadsFor(se, equipment, session.loadUnit)] as const)),
-    [exercises, equipment, session.loadUnit],
-  );
 
   const [selected, setSelected] = useState<SetRef | null>(null);
   const defaultActive = firstUnlogged(exercises);
@@ -128,7 +121,7 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
 
     const left = remaining - (index < se.sets.length ? 1 : 0);
     if (left > 0) {
-      const seconds = restSecondsFor(se.exerciseId);
+      const seconds = se.restSeconds;
       timer.start(seconds);
       setAnnouncement(`Set ${index + 1} logged. Rest ${fmtCountdown(seconds)}.`);
     } else {
@@ -272,7 +265,6 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
                   session={session}
                   exercise={se}
                   active={active}
-                  loads={loads.get(se.id) ?? []}
                   feedback={fb}
                   askSoreness={bounds.first.get(se.muscle) === se.id && fb?.soreness == null && !muscleStarted}
                   askFeedback={bounds.last.get(se.muscle) === se.id && isExerciseDone(se)}

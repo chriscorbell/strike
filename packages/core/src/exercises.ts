@@ -172,6 +172,13 @@ export const EXERCISES: readonly Exercise[] = [
 
 const BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
 
+const ISOLATION_PATTERNS: Pattern[] = ["fly", "lateral_raise", "rear_delt", "curl", "triceps_extension", "forearm", "knee_extension", "knee_flexion", "calf_raise", "core", "front_raise", "shrug", "pullover"];
+
+export const isIsolation = (e: Pick<Exercise, "pattern">) => ISOLATION_PATTERNS.includes(e.pattern);
+
+/** Rest between sets: two minutes for compound lifts, ninety seconds for isolation work. */
+export const restSecondsFor = (e: Pick<Exercise, "pattern">) => (isIsolation(e) ? 90 : 120);
+
 export function getExercise(id: string): Exercise | undefined {
   return BY_ID.get(id);
 }
