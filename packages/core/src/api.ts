@@ -99,6 +99,7 @@ export interface SessionSummary {
   label: string;
   location: Location;
   status: SessionStatus;
+  isDeload: boolean;
   date: string | null;
   completedAt: string | null;
   setCount: number;
@@ -145,6 +146,11 @@ export interface ExerciseInfo {
 export interface ExerciseHistoryResponse {
   exercise: ExerciseInfo;
   points: { date: string; sessionId: number; bestWeight: number | null; bestReps: number; e1rm: number | null; sets: { weight: number | null; reps: number; rir: number | null }[] }[];
+}
+
+export interface CheckInStatus {
+  due: boolean;
+  latest: CheckIn | null;
 }
 
 export interface MenuResponse {

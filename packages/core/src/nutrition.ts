@@ -1,5 +1,10 @@
-import type { Macros, NutritionTargets, Profile } from "./schemas.ts";
-import { round, roundTo } from "./units.ts";
+import type { Macros, NutritionTargets, Profile, Units } from "./schemas.ts";
+import { kgToLb, round, roundTo } from "./units.ts";
+
+/** A weekly rate in the person's units, e.g. "1.0 lb/week". */
+export function formatRate(kgPerWeek: number, units: Units = "metric"): string {
+  return units === "imperial" ? `${round(kgToLb(kgPerWeek), 1).toFixed(1)} lb/week` : `${round(kgPerWeek, 2)} kg/week`;
+}
 
 export interface BodyStats {
   weightKg: number;
@@ -84,7 +89,7 @@ function buildMacros(kcal: number, proteinG: number, fatG: number, fatFloorG: nu
 
 export interface TargetInputs {
   stats: BodyStats;
-  profile: Pick<Profile, "goal" | "activityLevel" | "training">;
+  profile: Pick<Profile, "goal" | "activityLevel" | "training"> & { units?: Units };
   effectiveDate: string;
 }
 
@@ -108,7 +113,7 @@ export function initialTargets({ stats, profile, effectiveDate }: TargetInputs):
   const reason =
     direction === "maintain"
       ? "Starting at estimated maintenance."
-      : `Starting ${Math.abs(Math.round(delta))} kcal/day ${direction === "lose" ? "below" : "above"} estimated maintenance to ${direction} about ${Math.abs(round(rate, 2))} kg a week.`;
+      : `Starting ${Math.abs(Math.round(delta))} kcal/day ${direction === "lose" ? "below" : "above"} estimated maintenance to ${direction} about ${formatRate(Math.abs(rate), profile.units)}.`;
 
   return {
     effectiveDate,
@@ -129,6 +134,7 @@ export interface AdjustmentInputs {
   daysOfData: number;
   /** Weigh-ins over the past seven days. */
   recentWeighIns: number;
+  units?: Units;
 }
 
 export interface Adjustment {
@@ -152,7 +158,7 @@ export function weeklyAdjustment(a: AdjustmentInputs): Adjustment {
   const raw = (-error * KCAL_PER_KG) / 7 / 2;
   const deltaKcal = Math.max(-250, Math.min(250, roundTo(raw, 25)));
   if (deltaKcal === 0) return { deltaKcal: 0, reason: "Close to pace, so calories stay the same." };
-  const rateText = `${round(a.rateKgPerWeek, 2)} kg/week vs a target of ${round(a.targetRateKgPerWeek, 2)}`;
+  const rateText = `${formatRate(a.rateKgPerWeek, a.units)} against a target of ${formatRate(a.targetRateKgPerWeek, a.units)}`;
   return {
     deltaKcal,
     reason: `${deltaKcal > 0 ? "Adding" : "Cutting"} ${Math.abs(deltaKcal)} kcal/day: trend is ${rateText}.`,

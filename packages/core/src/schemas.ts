@@ -257,6 +257,8 @@ export const SessionSet = z.object({
   targetReps: z.number().int(),
   targetRir: z.number().int(),
   log: SetLog.nullable(),
+  /** Beyond the planned sets: added during the session. */
+  extra: z.boolean(),
 });
 export type SessionSet = z.infer<typeof SessionSet>;
 
@@ -308,8 +310,11 @@ export type SessionStatus = z.infer<typeof SessionStatus>;
 export const Session = z.object({
   id: z.number(),
   mesoId: z.number(),
+  /** 0-based: week 0 is the first week of the block. */
   week: z.number().int(),
   dayIndex: z.number().int(),
+  /** Hard weeks in the block; week === hardWeeks is the deload. */
+  hardWeeks: z.number().int(),
   label: z.string(),
   location: Location,
   status: SessionStatus,

@@ -10,6 +10,7 @@ The server in `apps/server` serves this API under `/api` and the web app at `/`.
 - **Dates** are local calendar days, `"YYYY-MM-DD"`, in the profile's time zone. **Times** are `"HH:MM"`, 24-hour, local. Timestamps (`loggedAt`, `createdAt`...) are ISO-8601 UTC strings.
 - **Units:** body weight and measurements are always sent and stored in kg and cm (`weightKg`, `waistCm`...). Clients convert for display using `profile.units`. Training loads (`weight`, `targetWeight`, `startWeight`) are in the load unit, `session.loadUnit`: lb for imperial, kg for metric. Dumbbell loads are per dumbbell.
 - **Weekdays:** `0` = Sunday through `6` = Saturday.
+- **Weeks** of a block are 0-based (`week: 0` is the first week); `week === hardWeeks` is the deload week. Display `week + 1`.
 - **Coach jobs:** work that calls Claude runs in the background. Endpoints that start one return a `Job`; poll `GET /api/jobs/:id` (every 2–3 s is fine) until `status` is `succeeded` or `failed`. `TodayResponse.pendingJobs` lists jobs still running so a client can show that the coach is working.
 
 ## Endpoints
@@ -43,29 +44,30 @@ The server in `apps/server` serves this API under `/api` and the web app at `/`.
 | POST | `/api/weights/batch` | `{ entries: [{ date, weightKg }], source: "healthkit" }` | `{ imported: number }`. For Apple Health sync; send each day's first morning reading. |
 | DELETE | `/api/weights/:date` | — | `{ ok: true }` |
 | GET | `/api/measurements` | — | `MeasurementEntry[]`, newest first |
-| POST | `/api/measurements` | `{ date, ...Measurements }` | `MeasurementEntry`. Body fat is estimated (Navy method) when waist and neck are given and `bodyFatPercent` is null. |
+| POST | `/api/measurements` | `{ date, ...Measurements }` | `MeasurementEntry`. One entry per date; posting the same date replaces it. Body fat is estimated (Navy method) when waist and neck are given and `bodyFatPercent` is null. |
+| DELETE | `/api/measurements/:id` | — | `{ ok: true }` |
 
 ### Training
 
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
-| GET | `/api/meso` | — | `MesoOverview` or `null` while the first one is being built |
+| GET | `/api/meso` | — | `MesoOverview` or `null` while the first one is being built. Grid cells are `null` until that session is next (sessions are created one at a time). |
 | POST | `/api/meso/regenerate` | `{ note?: string }` | `Job`. Builds a new mesocycle starting with the next session. |
 | GET | `/api/sessions?limit=30` | — | `SessionSummary[]`, completed and skipped sessions, newest first |
 | GET | `/api/sessions/:id` | — | `Session` |
 | POST | `/api/sessions/:id/start` | `{ location?: "home" \| "gym" }` | `Session`. Refreshes prescriptions from the latest history and swaps exercises that the chosen location can't support. |
 | POST | `/api/sessions/:id/location` | `{ location }` | `Session`. Same swap without starting. |
 | GET | `/api/sessions/:id/exercises/:seId/alternatives` | — | `ExerciseInfo[]` available at the session's location |
-| POST | `/api/sessions/:id/exercises/:seId/swap` | `{ exerciseId, permanent: boolean }` | `Session`. `permanent` also changes the mesocycle so future weeks use it. |
+| POST | `/api/sessions/:id/exercises/:seId/swap` | `{ exerciseId, permanent: boolean }` | `Session`. `permanent` also changes the mesocycle so future weeks use it. `409` once the exercise has logged sets. |
 | POST | `/api/sessions/:id/sets` | `LogSetRequest` | `Session`. Upserts the set at `setIndex`; logging a set past the planned count adds a set. Starts the session if needed. |
-| DELETE | `/api/sessions/:id/sets/:setId` | — | `Session` |
+| DELETE | `/api/sessions/:id/sets/:setId` | — | `Session`. Deleting a set added during the session (`extra: true`) removes the set itself. |
 | PUT | `/api/sessions/:id/feedback` | `MuscleFeedback` | `Session`. Per muscle: soreness (asked at the start), pump and workload (after its last exercise), joint pain. Drives next week's set counts. |
 | POST | `/api/sessions/:id/complete` | — | `CompleteSessionResponse` |
 | POST | `/api/sessions/:id/skip` | — | `Session` |
-| GET | `/api/exercises` | — | `ExerciseInfo[]` |
+| GET | `/api/exercises?logged=1` | — | `ExerciseInfo[]`; with `logged=1`, only exercises that have logged sets |
 | GET | `/api/exercises/:id/history` | — | `ExerciseHistoryResponse` |
 
-Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyweight work), `targetReps`, `targetRir` and the `log` once done. Log what was actually done: `weight`, `reps`, and `rir` (reps left in reserve; `0` = to failure; null means "about the target"). The progression engine uses those numbers to decide the next session's weight and reps; `SessionExercise.prescriptionNote` explains today's choice in one sentence.
+Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyweight work), `targetReps`, `targetRir`, the `log` once done, and `extra` for sets added during the session. Bodyweight sets may log a `weight` as added load. Log what was actually done: `weight`, `reps`, and `rir` (reps left in reserve; `0` = to failure; null means "about the target"). The progression engine uses those numbers to decide the next session's weight and reps; `SessionExercise.prescriptionNote` explains today's choice in one sentence.
 
 ### Meals
 
@@ -84,7 +86,8 @@ Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyw
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
 | GET | `/api/checkins` | — | `CheckIn[]`, newest first |
+| GET | `/api/checkins/status` | — | `CheckInStatus`: `{ due, latest }` |
 | POST | `/api/checkins/run` | `{ note?: string }` | `CheckIn`. Runs this week's check-in now if it hasn't run: weight trend, calorie adjustment, adherence; the coach's note arrives later via a job. |
 | POST | `/api/coach/note` | `{ note: string }` | `{ ok: true }`. A note for the coach ("traveling next week", "left knee is sore") used by the next plan it writes. |
-| GET | `/api/jobs?pending=1` | — | `Job[]` |
+| GET | `/api/jobs?pending=1` | — | `Job[]`: pending jobs, or the 20 most recent without `pending` (failed ones included) |
 | GET | `/api/jobs/:id` | — | `Job` |
