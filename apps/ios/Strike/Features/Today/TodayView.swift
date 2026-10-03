@@ -124,6 +124,8 @@ struct TodayView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
+            // Exactly the screen's width, so nothing inside can make the page scroll sideways.
+            .containerRelativeFrame(.horizontal)
             .animation(Theme.spring, value: data.weight.loggedKg)
             .animation(Theme.spring, value: data.pendingJobs.map(\.id))
         }

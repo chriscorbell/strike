@@ -172,6 +172,37 @@ private struct MealEntry: View {
     private var featured: MealOption? { meal.options.first }
     private var busy: Bool { store.busySlots.contains(meal.slotIndex) }
 
+    @ViewBuilder private var actionButtons: some View {
+        if let featured {
+            Button {
+                Task { await store.log(featured, for: meal) }
+            } label: {
+                Group {
+                    if busy {
+                        ProgressView().tint(.white)
+                    } else {
+                        Label("Ate this", systemImage: "checkmark")
+                            .lineLimit(1)
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 30)
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(busy)
+        }
+        Button {
+            onSomethingElse()
+        } label: {
+            Text("Something else")
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 30)
+        }
+        .buttonStyle(.glass)
+        .disabled(busy)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
@@ -237,37 +268,11 @@ private struct MealEntry: View {
             .buttonStyle(.plain)
 
             if isNext, meal.log == nil {
-                HStack(spacing: 8) {
-                    if let featured {
-                        Button {
-                            Task { await store.log(featured, for: meal) }
-                        } label: {
-                            Group {
-                                if busy {
-                                    ProgressView().tint(.white)
-                                } else {
-                                    Label("Ate this", systemImage: "checkmark")
-                                        .lineLimit(1)
-                                        .fixedSize()
-                                }
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 30)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(busy)
-                    }
-                    Button {
-                        onSomethingElse()
-                    } label: {
-                        Text("Something else")
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .fixedSize()
-                            .frame(minHeight: 30)
-                    }
-                    .buttonStyle(.glass)
-                    .disabled(busy)
+                // Side by side when they fit; stacked on narrow cards or large text, so the row never
+                // grows wider than the card (that made the whole Today page scroll sideways).
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { actionButtons }
+                    VStack(spacing: 8) { actionButtons }
                 }
                 .transition(.opacity)
             }
