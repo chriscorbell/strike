@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-*
+.DS_Store
+.scratch/
+# iOS
+apps/ios/build/
+apps/ios/DerivedData/
+apps/ios/*.xcodeproj/xcuserdata/
+apps/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
