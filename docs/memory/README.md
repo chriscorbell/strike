@@ -22,4 +22,4 @@ Read this index and [the protocol](protocol.md) when starting or resuming a sess
 
 ## Review record
 
-No topic notes
+2026-10-03: ordinary review. No notes existed before this session; the three written this session ([runtime and coach](context/runtime-and-coach.md), [pnpm 12 native builds](lessons/pnpm12-native-builds.md), [Strike v1 build](work/2026-10-03-strike-v1-build-a7k2.md)) were reconciled by the task itself, so nothing else was sampled. Next cursor: start of `context/`.
