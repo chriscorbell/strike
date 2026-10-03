@@ -2,7 +2,7 @@
 import type { Job, JobKind, Profile, StateResponse, Units } from "@strike/core";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { endpoints } from "./endpoints.ts";
+import { endpoints, type MenuWeek } from "./endpoints.ts";
 
 export const keys = {
   state: ["state"] as const,
@@ -17,6 +17,7 @@ export const keys = {
   loggedExercises: ["exercises", "logged"] as const,
   exerciseHistory: (id: string) => ["exerciseHistory", id] as const,
   menu: ["menu"] as const,
+  menuWeek: (week: MenuWeek) => ["menu", week] as const,
   mealHistory: (days?: number) => (days ? (["mealHistory", days] as const) : (["mealHistory"] as const)),
   checkins: ["checkins"] as const,
   checkinStatus: ["checkins", "status"] as const,
@@ -68,10 +69,10 @@ export const useExerciseHistory = (id: string | null) =>
     queryFn: () => endpoints.exerciseHistory(id!),
     enabled: !!id,
   });
-export const useMenu = () =>
+export const useMenu = (week: MenuWeek = "current") =>
   useQuery({
-    queryKey: keys.menu,
-    queryFn: endpoints.menu,
+    queryKey: keys.menuWeek(week),
+    queryFn: () => endpoints.menu(week),
     refetchInterval: (query) => (query.state.data?.pendingJob ? 3000 : false),
   });
 export const useMealHistory = (days = 14) =>

@@ -86,6 +86,14 @@ struct OnboardingGoalStep: View {
 struct OnboardingDayStep: View {
     @Bindable var model: OnboardingModel
 
+    /// Nil (the day before the week starts) is tagged -1, so the optional stays unset unless chosen.
+    private var groceryDay: Binding<Int> {
+        Binding(
+            get: { model.draft.profile.schedule.shoppingDay ?? -1 },
+            set: { model.draft.profile.schedule.shoppingDay = $0 < 0 ? nil : $0 }
+        )
+    }
+
     var body: some View {
         Section {
             Picker("Activity", selection: $model.draft.profile.activityLevel) {
@@ -119,13 +127,21 @@ struct OnboardingDayStep: View {
         }
 
         Section {
-            Picker("Check-in day", selection: $model.draft.profile.schedule.checkInDay) {
+            Picker("Week starts on", selection: $model.draft.profile.schedule.checkInDay) {
                 ForEach(Dates.orderedWeekdays, id: \.self) { day in
                     Text(Dates.weekdays[day]).tag(day)
                 }
             }
+            Picker("Grocery day", selection: groceryDay) {
+                Text("Day before (\(Dates.weekdays[(model.draft.profile.schedule.checkInDay + 6) % 7]))").tag(-1)
+                ForEach(Dates.orderedWeekdays, id: \.self) { day in
+                    Text(Dates.weekdays[day]).tag(day)
+                }
+            }
+        } header: {
+            Text("Your week")
         } footer: {
-            Text("A weekly look at your weight trend, training and eating. Plan weeks start on this day.")
+            Text("The evening before grocery day, Strike checks in on your week and writes next week's meal plan and grocery list.")
         }
     }
 }

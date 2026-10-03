@@ -180,7 +180,8 @@ private struct MealEntry: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(meal.label)
-                            .font(.headline)
+                            .font(meal.plannedOption != nil && meal.log == nil ? .subheadline.weight(.semibold) : .headline)
+                            .foregroundStyle(meal.plannedOption != nil && meal.log == nil ? Color.secondary : Color.primary)
                         if let role = meal.role.displayName, role.lowercased() != meal.label.lowercased() {
                             Text(role)
                                 .font(.caption.weight(.semibold))
@@ -203,6 +204,15 @@ private struct MealEntry: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
+                    } else if let planned = meal.plannedOption {
+                        // The week's plan says what to eat: lead with the dish.
+                        Text(featuredTitle(planned))
+                            .font(.body.weight(.semibold))
+                            .lineLimit(2)
+                        Text("\(Fmt.kcal(planned.macros.kcal)) · \(Fmt.integer(planned.macros.proteinG))g protein\(planned.kind == .out ? " · grab and go" : "")")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     } else {
                         Text("\(Fmt.integer(meal.targets.proteinG))g protein · \(Fmt.kcal(meal.targets.kcal))")
                             .font(.subheadline)

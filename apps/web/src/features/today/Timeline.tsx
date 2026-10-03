@@ -6,7 +6,7 @@ import { Link } from "react-router";
 import { WorkingGlyph } from "../../components/CoachStatus.tsx";
 import { MacroLine } from "../../components/Macros.tsx";
 import { Collapse } from "../../components/Page.tsx";
-import { Button } from "../../components/ui/Button.tsx";
+import { Button, IconButton } from "../../components/ui/Button.tsx";
 import { Badge } from "../../components/ui/States.tsx";
 import { toast } from "../../components/ui/Toast.tsx";
 import { cn } from "../../lib/cn.ts";
@@ -142,10 +142,13 @@ function MealItem({ date, meal, past, last }: { date: string; meal: TimelineMeal
   }, [moreJob.data, jobId]);
 
   const log = meal.log;
-  const featured = meal.options[0];
+  // The planned dish is what you have groceries for; without a plan the first option is the suggestion.
+  const planned = meal.plannedOptionId ? (meal.options.find((o) => o.id === meal.plannedOptionId) ?? null) : null;
+  const featured = planned ?? meal.options[0];
   const role = roleTag(meal.role, meal.label);
-  const home = meal.options.filter((o) => o.kind === "home");
-  const out = meal.options.filter((o) => o.kind === "out");
+  const others = meal.options.filter((o) => o.id !== planned?.id);
+  const home = others.filter((o) => o.kind === "home");
+  const out = others.filter((o) => o.kind === "out");
   const state = log ? (log.status === "skipped" ? "skipped" : "done") : "open";
 
   const ate = (option: MealOption) => {
@@ -178,43 +181,51 @@ function MealItem({ date, meal, past, last }: { date: string; meal: TimelineMeal
       <TimeLabel time={meal.time} dim={past && !log} />
       <Rail state={state} last={last} />
       <div className="min-w-0 flex-1 pb-5">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((o) => !o)}
-          className="group -mx-2 -mt-1 flex w-[calc(100%+1rem)] items-start gap-3 rounded-xl px-2 py-1 text-left transition-colors hover:bg-surface"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className={cn("text-[15px] font-semibold", state === "skipped" ? "text-ink-3" : "text-ink")}>{meal.label}</span>
-              {role && <Badge tone="outline">{role}</Badge>}
+        <div className="-mx-2 -mt-1 flex items-start gap-1">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => setOpen((o) => !o)}
+            className="group flex min-w-0 flex-1 items-start gap-3 rounded-xl px-2 py-1 text-left transition-colors hover:bg-surface"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[13px] font-medium text-ink-3">{meal.label}</span>
+                {role && <Badge tone="outline">{role}</Badge>}
+              </div>
+              <p
+                className={cn(
+                  "mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug",
+                  state === "skipped" || !featured ? "text-ink-3" : "text-ink",
+                )}
+              >
+                {log ? (log.status === "skipped" ? "Skipped" : log.name) : featured ? featured.name : "No options yet"}
+              </p>
             </div>
-            <p className="mt-0.5 truncate text-sm text-ink-3">
-              {log ? (
-                log.status === "skipped" ? (
-                  "Skipped"
-                ) : (
-                  <span className="text-ink-2">{log.name}</span>
-                )
-              ) : featured ? (
-                featured.name
-              ) : (
-                "No options yet"
-              )}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 pt-0.5">
-            <span className="tnum text-[13px] text-ink-3">
-              {log?.status === "eaten" ? fmtKcal(log.macros.kcal) : fmtKcal(meal.targets.kcal)} kcal
-            </span>
-            <ChevronDown
-              size={16}
-              className={cn("text-ink-3 transition-transform duration-200", open && "rotate-180")}
-              aria-hidden
+            <div className="flex shrink-0 items-center gap-2 pt-0.5">
+              <span className="tnum text-[13px] text-ink-3">
+                {fmtKcal(log?.status === "eaten" ? log.macros.kcal : (featured?.macros.kcal ?? meal.targets.kcal))} kcal
+              </span>
+              <ChevronDown
+                size={16}
+                className={cn("text-ink-3 transition-transform duration-200", open && "rotate-180")}
+                aria-hidden
+              />
+            </div>
+          </button>
+          {!log && featured && (
+            <IconButton
+              icon={Check}
+              size="sm"
+              variant="outline"
+              label={`Ate ${featured.name}`}
+              loading={logMeal.isPending && pendingOption === featured.id}
+              onClick={() => ate(featured)}
+              className="mt-0.5 rounded-full"
             />
-          </div>
-        </button>
+          )}
+        </div>
 
         <Collapse open={open} id={panelId}>
           <div className="pt-3">
@@ -241,7 +252,8 @@ function MealItem({ date, meal, past, last }: { date: string; meal: TimelineMeal
 
             {meal.options.length > 0 && (
               <div className="mt-2">
-                {home.length > 0 && optionGroup("Home", home)}
+                {planned && optionGroup("Planned", [planned], true)}
+                {home.length > 0 && optionGroup(planned ? "Other home dishes" : "Home", home)}
                 {out.length > 0 && optionGroup("Grab and go", out)}
               </div>
             )}
@@ -316,7 +328,7 @@ function MealItem({ date, meal, past, last }: { date: string; meal: TimelineMeal
     </div>
   );
 
-  function optionGroup(title: string, options: MealOption[]) {
+  function optionGroup(title: string, options: MealOption[], primary = false) {
     return (
       <div className="mt-2" key={title}>
         <h4 className="pt-2 text-[13px] font-medium text-ink-3">{title}</h4>
@@ -329,7 +341,12 @@ function MealItem({ date, meal, past, last }: { date: string; meal: TimelineMeal
               onOpen={() => setDetail(o)}
               action={
                 log?.optionId === o.id ? undefined : (
-                  <AteButton onClick={() => ate(o)} loading={logMeal.isPending && pendingOption === o.id} label={log ? "Ate this instead" : "Ate this"} />
+                  <AteButton
+                    onClick={() => ate(o)}
+                    loading={logMeal.isPending && pendingOption === o.id}
+                    label={log ? "Ate this instead" : "Ate this"}
+                    primary={primary && !log}
+                  />
                 )
               }
             />

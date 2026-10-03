@@ -95,6 +95,11 @@ struct TodayView: View {
                     checkInCard
                 }
 
+                if let upcoming = data.upcomingWeek {
+                    UpcomingWeekCard(week: upcoming)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 DayTimeline(data: data, path: $path) {
                     showWorkoutTime = true
                 }
@@ -298,5 +303,70 @@ struct MacroSummaryCard: View {
             }
         }
         .card()
+    }
+}
+
+// MARK: - Upcoming week
+
+/// From the prep evening until the week starts: whether next week's plan and groceries are ready.
+private struct UpcomingWeekCard: View {
+    var week: UpcomingWeek
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        if week.ready {
+            Button {
+                app.showMeals(week: .next, section: .groceries)
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "cart.fill")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Next week is planned")
+                            .font(.headline)
+                            .foregroundStyle(Color.primary)
+                        Text("\(week.itemCount) items, about \(Fmt.usdWhole(week.costUsd)) · \(shopText)")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.secondary)
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .card()
+            .accessibilityHint("Opens next week's grocery list")
+        } else {
+            HStack(spacing: 14) {
+                ProgressView()
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next week's plan is being written")
+                        .font(.headline)
+                    Text("The grocery list follows · \(shopText)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .card()
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var shopText: String {
+        switch Dates.relative(week.shoppingDate) {
+        case "Today": "Shop today"
+        case "Tomorrow": "Shop tomorrow"
+        default:
+            if let day = Dates.weekday(of: week.shoppingDate) { "Shop \(Dates.weekdays[day])" } else { "Shop \(Dates.short(week.shoppingDate))" }
+        }
     }
 }

@@ -24,13 +24,14 @@ struct PlanView: View {
 
     private var checkInDue: Bool { app.today.data?.checkIn.due == true }
 
-    /// This plan week's check-in already exists, so running it again would change nothing.
+    /// A check-in already covers the current or coming plan week (they run ahead of the week, the
+    /// evening before grocery day), so running another would change nothing.
     private var checkInRanThisWeek: Bool {
         guard let latest = store.checkIns.first, let checkInDay = app.profile?.schedule.checkInDay else { return false }
         let today = app.today.data?.date ?? app.state?.today ?? Dates.today
         guard let weekday = Dates.weekday(of: today) else { return false }
         let weekStart = Dates.adding(days: -((weekday - checkInDay + 7) % 7), to: today)
-        return latest.weekStart == weekStart
+        return latest.weekStart >= weekStart
     }
     private var nextSession: TodayResponse.NextSession? { app.today.data?.nextSession }
 
@@ -149,8 +150,10 @@ struct PlanView: View {
         ContentUnavailableView {
             Label("No check-ins yet", systemImage: "checklist")
         } description: {
-            if let day = app.profile?.schedule.checkInDay, Dates.weekdays.indices.contains(day) {
-                Text("The first one is due on \(Dates.weekdays[day]).")
+            if let prep = app.meals.response(for: .next)?.prepAt {
+                Text("The first one runs \(Dates.medium(prep.date)) at \(Dates.display(prep.time)), ahead of grocery day.")
+            } else if let schedule = app.profile?.schedule {
+                Text("The first one runs \(Dates.weekdays[(schedule.effectiveShoppingDay + 6) % 7]) evening, ahead of grocery day.")
             }
         }
         .frame(maxWidth: .infinity)

@@ -15,6 +15,7 @@ sqlite.pragma("busy_timeout = 5000");
 export const db = drizzle(sqlite, { schema });
 export type DB = typeof db;
 export { schema };
+export type { MenuData } from "./schema.ts";
 
 export function runMigrations() {
   migrate(db, { migrationsFolder: env.migrations });

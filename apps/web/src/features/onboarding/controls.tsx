@@ -198,14 +198,22 @@ export function WeekdayMulti({ value, onChange, max = 7, labelId, describedBy }:
 interface WeekdaySingleProps extends Partial<QuestionA11y> {
   value: number;
   onChange: (day: number) => void;
+  /** Days to offer, in display order. Defaults to the whole week, Monday first. */
+  days?: readonly number[];
 }
 
 /** Pick one weekday (radiogroup). */
-export function WeekdaySingle({ value, onChange, labelId, describedBy }: WeekdaySingleProps) {
-  const { onKeyDown, ref } = useRoving(WEEK_ORDER, onChange);
+export function WeekdaySingle({ value, onChange, labelId, describedBy, days = WEEK_ORDER }: WeekdaySingleProps) {
+  const { onKeyDown, ref } = useRoving(days, onChange);
   return (
-    <div role="radiogroup" aria-labelledby={labelId} aria-describedby={describedBy} className="grid grid-cols-7 gap-1.5">
-      {WEEK_ORDER.map((d, i) => {
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      aria-describedby={describedBy}
+      className="grid gap-1.5"
+      style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
+    >
+      {days.map((d, i) => {
         const on = value === d;
         return (
           <button
@@ -215,7 +223,7 @@ export function WeekdaySingle({ value, onChange, labelId, describedBy }: Weekday
             role="radio"
             aria-checked={on}
             aria-label={WEEKDAY_LONG[d]}
-            tabIndex={on ? 0 : -1}
+            tabIndex={on || (!days.includes(value) && i === days.length - 1) ? 0 : -1}
             onClick={() => onChange(d)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={dayClass(on)}

@@ -6,7 +6,10 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { zValidator } from "@hono/zod-validator";
 import { z, ZodError, type ZodType } from "zod";
 import {
+  addDays,
   LocalDate,
+  prepMomentFor,
+  shoppingDateFor,
   Location,
   LogSetRequest,
   MealLogRequest,
@@ -21,7 +24,7 @@ import { env } from "./env.ts";
 import { HttpError } from "./http.ts";
 import { addCoachNote, checkInDue, latestCheckIn, listCheckIns, runCheckIn } from "./services/checkins.ts";
 import { enqueue, getJob, pendingJobs, recentJobs } from "./services/jobs.ts";
-import { deleteMealLog, logMeal, mealHistory, menuRowFor, setDayOverride, toMenu } from "./services/meals.ts";
+import { deleteMealLog, logMeal, mealHistory, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
 import { addMeasurements, onboard, state, updateProfile } from "./services/onboarding.ts";
 import { requireProfile, today } from "./services/profile.ts";
 import { dayView } from "./services/today.ts";
@@ -158,11 +161,33 @@ export function createApp() {
   app.get("/api/exercises/:id/history", (c) => c.json(training.exerciseHistoryView(c.req.param("id"))));
 
   // Meals
+  // ?week=next is the coming plan week (ready from the evening before shopping day); default this week.
+  const weekParam = (value: string | undefined) => {
+    const profile = requireProfile();
+    const current = planWeekStart(profile, today(profile));
+    if (value === "next") return addDays(current, 7);
+    if (value == null || value === "current") return current;
+    throw new HttpError(400, "week is current or next.");
+  };
   app.get("/api/menu", (c) => {
-    const row = menuRowFor(today());
-    return c.json({ menu: row ? toMenu(row) : null, pendingJob: pendingJobs("meal_menu")[0] ?? null });
+    const week = weekParam(c.req.query("week"));
+    const row = c.req.query("week") === "next" ? menuRowForWeek(week) : menuRowFor(week);
+    const profile = requireProfile();
+    return c.json({
+      menu: row ? toMenu(row) : null,
+      pendingJob: pendingJobs("meal_menu")[0] ?? null,
+      prepAt: prepMomentFor(profile, week),
+      shoppingDate: shoppingDateFor(profile, week),
+    });
   });
-  app.post("/api/menu/regenerate", json(z.object({ note: z.string().max(2000).optional() })), (c) => c.json(enqueue("meal_menu", { note: c.req.valid("json").note ?? null, reason: "Requested" })));
+  app.post("/api/menu/regenerate", json(z.object({ note: z.string().max(2000).optional(), week: z.enum(["current", "next"]).optional() })), (c) => {
+    const body = c.req.valid("json");
+    return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, reason: "Requested" }));
+  });
+  app.put("/api/menu/:id/plan", json(z.object({ date: LocalDate, slotIndex: z.number().int().min(0), optionId: z.string() })), (c) => {
+    const body = c.req.valid("json");
+    return c.json(setPlannedOption(id(c), body.date, body.slotIndex, body.optionId));
+  });
   app.post("/api/meals/log", json(MealLogRequest), (c) => c.json(logMeal(c.req.valid("json"))));
   app.delete("/api/meals/log/:id", (c) => {
     deleteMealLog(id(c));

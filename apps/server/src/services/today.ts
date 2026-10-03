@@ -1,7 +1,7 @@
-import { addDays, formatTime, parseTime, type TimelineItem, type TodayResponse } from "@strike/core";
+import { addDays, formatTime, isPastPrep, minutesNowIn, parseTime, planWeekStart, shoppingDateFor, type MealOption, type Profile, type TimelineItem, type TodayResponse } from "@strike/core";
 import { checkInDue, latestCheckIn } from "./checkins.ts";
 import { pendingJobs } from "./jobs.ts";
-import { consumedOn, dayOverride, dayTypeOn, logsOn, menuRowFor, optionsFor, plannedMeals, toMenu, workoutTimeOn } from "./meals.ts";
+import { consumedOn, dayOverride, dayTypeOn, logsOn, menuRowFor, menuRowForWeek, optionsFor, plannedMeals, plannedOptionFor, toMenu, workoutTimeOn } from "./meals.ts";
 import { requireProfile, targetsOn, today } from "./profile.ts";
 import { activeMeso, ensureNextSession, sessionOnDate, sessionSetCount } from "./training.ts";
 import { trendThrough, weightOn } from "./weights.ts";
@@ -26,16 +26,23 @@ export function dayView(date?: string): TodayResponse {
   const menu = menuRow ? toMenu(menuRow) : null;
   const logs = logsOn(d);
 
-  const timeline: TimelineItem[] = meals.map((m) => ({
-    kind: "meal",
-    time: m.time,
-    slotIndex: m.slotIndex,
-    label: m.label,
-    role: m.role,
-    targets: m.targets,
-    options: optionsFor(menu, dayType, m.slotIndex, d),
-    log: logs.find((l) => l.slotIndex === m.slotIndex) ?? null,
-  }));
+  const timeline: TimelineItem[] = meals.map((m) => {
+    const planned = plannedOptionFor(menu, d, m.slotIndex);
+    const others = optionsFor(menu, dayType, m.slotIndex, d).filter((o) => o.id !== planned?.id);
+    // With a plan, the planned dish leads and home dishes keep their order (no daily rotation).
+    const options: MealOption[] = planned ? [planned, ...(menu?.slots.find((s) => s.dayType === dayType && s.slotIndex === m.slotIndex)?.options ?? others).filter((o) => o.id !== planned.id)] : others;
+    return {
+      kind: "meal",
+      time: m.time,
+      slotIndex: m.slotIndex,
+      label: m.label,
+      role: m.role,
+      targets: m.targets,
+      options,
+      plannedOptionId: planned?.id ?? null,
+      log: logs.find((l) => l.slotIndex === m.slotIndex) ?? null,
+    };
+  });
   if (session) {
     const counts = sessionSetCount(session.id);
     timeline.push({
@@ -75,9 +82,26 @@ export function dayView(date?: string): TodayResponse {
         ? { id: meso.id, name: meso.plan.name, week: sessionForMeso.week, hardWeeks: meso.plan.weeks, isDeload: sessionForMeso.isDeload, targetRir: sessionForMeso.targetRir }
         : null,
     nextSession: next ? { id: next.id, label: next.label, location: next.location, week: next.week, dayIndex: next.dayIndex } : null,
-    checkIn: { due: checkInDue(now), latest: latestCheckIn() },
+    checkIn: { due: checkInDue(), latest: latestCheckIn() },
     pendingJobs: pendingJobs(),
     menuReady: menu != null,
+    upcomingWeek: upcomingWeek(profile, now),
+  };
+}
+
+/** From the evening before shopping day until the week starts: whether next week's plan is ready. */
+function upcomingWeek(profile: Profile, now: string): TodayResponse["upcomingWeek"] {
+  const next = addDays(planWeekStart(profile, now), 7);
+  if (!isPastPrep(profile, next, now, minutesNowIn(profile.timezone))) return null;
+  const row = menuRowForWeek(next);
+  const groceries = row ? toMenu(row, profile).groceryList.filter((g) => !g.staple) : [];
+  return {
+    weekStart: next,
+    shoppingDate: shoppingDateFor(profile, next),
+    ready: row != null,
+    menuId: row?.id ?? null,
+    itemCount: groceries.length,
+    costUsd: Math.round(groceries.reduce((a, g) => a + g.costUsd, 0) * 100) / 100,
   };
 }
 

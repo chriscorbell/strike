@@ -34,8 +34,10 @@ export interface TimelineMeal {
   label: string;
   role: MealRole;
   targets: Macros;
-  /** Ordered so the featured option for the day comes first. */
+  /** The planned dish first, then the other options for this meal. */
   options: MealOption[];
+  /** The option the week's plan assigns to this meal (you have its groceries); null without a plan. */
+  plannedOptionId: string | null;
   log: MealLog | null;
 }
 
@@ -71,6 +73,19 @@ export interface TodayResponse {
   /** Coach jobs still queued or running, so clients can show progress. */
   pendingJobs: Job[];
   menuReady: boolean;
+  /**
+   * Next plan week, from the evening before shopping day until it starts: whether its meal plan and
+   * grocery list are ready.
+   */
+  upcomingWeek: {
+    weekStart: string;
+    shoppingDate: string;
+    ready: boolean;
+    menuId: number | null;
+    /** Items to buy, not counting pantry staples. */
+    itemCount: number;
+    costUsd: number;
+  } | null;
 }
 
 export interface WeightPoint {
@@ -156,6 +171,9 @@ export interface CheckInStatus {
 export interface MenuResponse {
   menu: MealMenu | null;
   pendingJob: Job | null;
+  /** When this week's plan is (or was) prepared: the evening before shopping day. */
+  prepAt: { date: string; time: string };
+  shoppingDate: string;
 }
 
 export interface MealHistoryDay {

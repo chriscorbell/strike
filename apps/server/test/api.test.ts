@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CompleteSessionResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
+import type { CompleteSessionResponse, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
 import { createApp } from "../src/app.ts";
 import { registerCoachHandlers } from "../src/coach/tasks.ts";
 import { closeDb, runMigrations } from "../src/db/index.ts";
@@ -108,6 +108,35 @@ describe("api", () => {
     expect(log.status).toBe(200);
     const after = (await call<TodayResponse>("GET", "/api/today")).body;
     expect(after.consumed.kcal).toBeGreaterThan(0);
+  });
+
+  it("plans each day's meals and totals the groceries", async () => {
+    const { body } = await call<MenuResponse>("GET", "/api/menu");
+    const menu = body.menu!;
+    expect(menu.plan.length).toBeGreaterThan(0);
+    const day = menu.plan[0]!;
+    expect(day.meals).toHaveLength(4);
+    expect(menu.groceryList.length).toBeGreaterThan(0);
+
+    const today = (await call<TodayResponse>("GET", `/api/today?date=${day.date}`)).body;
+    const meal = today.timeline.find((i) => i.kind === "meal")!;
+    if (meal.kind !== "meal") throw new Error("expected a meal");
+    expect(meal.plannedOptionId).toBe(day.meals.find((m) => m.slotIndex === meal.slotIndex)!.optionId);
+    expect(meal.options[0]!.id).toBe(meal.plannedOptionId);
+
+    // Swapping every planned meal on that day for grab-and-go shrinks the shopping.
+    const cost = (m: MealMenu) => m.groceryList.reduce((a, g) => a + g.costUsd, 0);
+    let updated = menu;
+    for (const m of day.meals) {
+      const slot = menu.slots.find((s) => s.dayType === day.dayType && s.slotIndex === m.slotIndex)!;
+      const out = slot.options.find((o) => o.kind === "out")!;
+      const res = await call<MealMenu>("PUT", `/api/menu/${menu.id}/plan`, { date: day.date, slotIndex: m.slotIndex, optionId: out.id });
+      expect(res.status).toBe(200);
+      updated = res.body;
+    }
+    expect(cost(updated)).toBeLessThanOrEqual(cost(menu));
+    expect((await call("GET", "/api/menu?week=next")).status).toBe(200);
+    expect((await call("GET", "/api/menu?week=someday")).status).toBe(400);
   });
 
   it("keeps manual weigh-ins over Apple Health", async () => {

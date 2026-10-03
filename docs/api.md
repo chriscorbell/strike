@@ -71,15 +71,20 @@ Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyw
 
 ### Meals
 
+Each plan week has a menu: options for every meal slot of a training day and a rest day, and a **plan** that assigns one option (normally a home-cooked, batch-cooked dish) to every meal of every remaining day. The grocery list is totaled from the plan's home-cooked meals and rounded to store packages, so it changes when the plan does. Next week's menu is prepared on the evening before shopping day (18:00 local), together with the weekly check-in.
+
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
-| GET | `/api/menu` | — | `MenuResponse`: this plan week's `MealMenu` (slots for training and rest days, grocery list, prep tips) |
-| POST | `/api/menu/regenerate` | `{ note?: string }` | `Job` |
-| POST | `/api/meals/log` | `MealLogRequest` | `MealLog`. Pick an `optionId` from the slot, or send `custom` macros, or `status: "skipped"`. Logging the same slot again replaces it. |
+| GET | `/api/menu?week=current\|next` | — | `MenuResponse`: the `menu`, any pending plan job, `prepAt` (when that week's plan is prepared) and `shoppingDate`. `current` (default) is this plan week; `next` is the coming week, whose `menu` is `null` until it's prepared. |
+| PUT | `/api/menu/:id/plan` | `{ date, slotIndex, optionId }` | `MealMenu`. Plans a different option for one meal; any option on the menu is allowed, and grab-and-go needs no groceries. |
+| POST | `/api/menu/regenerate` | `{ note?, week?: "current" \| "next" }` | `Job` |
+| POST | `/api/meals/log` | `MealLogRequest` | `MealLog`. Pick an `optionId`, or send `custom` macros, or `status: "skipped"`. Logging the same slot again replaces it. Logging doesn't change the plan. |
 | DELETE | `/api/meals/log/:id` | — | `{ ok: true }` |
 | GET | `/api/meals/history?days=14` | — | `MealHistoryDay[]`, newest first |
 | POST | `/api/meals/estimate` | `{ description: string }` | `Job`; its `result` is `{ name, macros }` for "what I actually ate" logging |
-| POST | `/api/meals/more-options` | `{ date, slotIndex }` | `Job`; its `result` is `MealOption[]`, also added to the menu slot |
+| POST | `/api/meals/more-options` | `{ date, slotIndex }` | `Job`; its `result` is `MealOption[]`, also added to that week's menu slot (plan one with `PUT /api/menu/:id/plan`) |
+
+`GroceryItem.quantity` is what to buy ("2 x 32 oz tub"), `needed` how much the plan uses ("about 3.2 lb"), and `staple` marks pantry items to check rather than buy. `TodayResponse.upcomingWeek` is set from the prep evening until the week starts, with whether the plan is ready and the grocery count and cost (staples excluded). `TimelineMeal.plannedOptionId` names the planned dish, which is `options[0]`.
 
 ### Check-ins and jobs
 
@@ -87,7 +92,7 @@ Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyw
 | --- | --- | --- | --- |
 | GET | `/api/checkins` | — | `CheckIn[]`, newest first |
 | GET | `/api/checkins/status` | — | `CheckInStatus`: `{ due, latest }` |
-| POST | `/api/checkins/run` | `{ note?: string }` | `CheckIn`. Runs this week's check-in now if it hasn't run: weight trend, calorie adjustment, adherence; the coach's note arrives later via a job. |
+| POST | `/api/checkins/run` | `{ note?: string }` | `CheckIn`. Runs the check-in now if it hasn't run: weight trend, calorie adjustment, adherence, then queues the coach's note and the week's meal plan. It runs automatically on the evening before shopping day for the coming week; before that, for the current week. |
 | POST | `/api/coach/note` | `{ note: string }` | `{ ok: true }`. A note for the coach ("traveling next week", "left knee is sore") used by the next plan it writes. |
 | GET | `/api/jobs?pending=1` | — | `Job[]`: pending jobs, or the 20 most recent without `pending` (failed ones included) |
 | GET | `/api/jobs/:id` | — | `Job` |

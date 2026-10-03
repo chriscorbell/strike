@@ -17,7 +17,12 @@ enum MealOptionKind: String, Codable, Sendable {
 struct MealOption: Codable, Hashable, Identifiable, Sendable {
     struct Ingredient: Codable, Hashable, Sendable {
         var item: String
+        /// As written in the recipe, e.g. "1 1/2 cups (340 g)".
         var amount: String
+        /// The grocery item it's bought as, for totaling the week's shopping.
+        var groceryId: String?
+        /// Amount in that grocery item's unit, as purchased.
+        var quantity: Double?
     }
 
     var id: String
@@ -44,11 +49,29 @@ struct MenuSlot: Codable, Hashable, Sendable {
     var options: [MealOption]
 }
 
+/// One thing to buy, totaled from the planned meals.
 struct GroceryItem: Codable, Hashable, Sendable {
     var item: String
+    /// What to buy, e.g. "2 x 32 oz tub".
     var quantity: String
+    /// How much the plan uses, e.g. "about 3.4 lb"; nil when untracked.
+    var needed: String?
     var section: String
     var costUsd: Double
+    /// A pantry item most kitchens already have: check before buying.
+    var staple: Bool
+}
+
+/// The planned dish for each meal of one day.
+struct PlanDay: Codable, Hashable, Sendable {
+    struct Meal: Codable, Hashable, Sendable {
+        var slotIndex: Int
+        var optionId: String
+    }
+
+    var date: LocalDate
+    var dayType: DayType
+    var meals: [Meal]
 }
 
 enum PlanSource: String, Codable, Sendable {
@@ -62,6 +85,9 @@ struct MealMenu: Codable, Hashable, Sendable {
     var createdAt: Timestamp
     var source: PlanSource
     var slots: [MenuSlot]
+    /// One entry per remaining day of the week; empty on menus from before planning.
+    var plan: [PlanDay]
+    /// Totaled from the plan's home-cooked meals.
     var groceryList: [GroceryItem]
     var prepTips: [String]
     var coachNote: String
@@ -108,9 +134,37 @@ struct MealLogRequest: Encodable, Sendable {
     }
 }
 
+/// `PUT /api/menu/:id/plan`.
+struct PlanMealRequest: Encodable, Sendable {
+    var date: LocalDate
+    var slotIndex: Int
+    var optionId: String
+}
+
+/// `POST /api/menu/regenerate`.
+struct RegenerateMenuRequest: Encodable, Sendable {
+    var note: String?
+    var week: MenuWeek
+}
+
+enum MenuWeek: String, Codable, CaseIterable, Identifiable, Sendable {
+    case current
+    case next
+
+    var id: String { rawValue }
+}
+
 struct MenuResponse: Codable, Sendable {
+    struct PrepAt: Codable, Hashable, Sendable {
+        var date: LocalDate
+        var time: TimeOfDay
+    }
+
     var menu: MealMenu?
     var pendingJob: Job?
+    /// When this week's plan is prepared, e.g. Friday 18:00.
+    var prepAt: PrepAt
+    var shoppingDate: LocalDate
 }
 
 struct MealHistoryDay: Codable, Hashable, Sendable {

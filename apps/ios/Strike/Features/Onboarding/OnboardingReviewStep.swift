@@ -56,7 +56,8 @@ struct OnboardingReviewStep: View {
             row("Activity", p.activityLevel.displayName)
             row("Wake up", Dates.display(p.schedule.wakeTime))
             row("Bedtime", Dates.display(p.schedule.sleepTime))
-            row("Check-in", Dates.weekdays[p.schedule.checkInDay])
+            row("Week starts", Dates.weekdays[p.schedule.checkInDay])
+            row("Grocery day", Dates.weekdays[p.schedule.effectiveShoppingDay])
         case .training:
             row("Experience", p.training.experience.displayName)
             row("Days", OnboardingDraft.weekdayList(p.training.days))
@@ -75,7 +76,7 @@ struct OnboardingReviewStep: View {
             row("Meals", "\(p.nutrition.mealsPerDay) a day")
             row("Diet", p.nutrition.dietStyle.displayName)
             row("Cooking", p.nutrition.cookingTime.detail)
-            row("Budget", "\(Fmt.usd(p.nutrition.weeklyBudgetUsd)) a week")
+            row("Budget", "\(Fmt.usdWhole(p.nutrition.weeklyBudgetUsd)) a week")
             row("Allergies", list(p.nutrition.allergies))
             if !p.nutrition.avoidFoods.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 row("Avoid", p.nutrition.avoidFoods)

@@ -12,6 +12,7 @@ import { fmtBodyWeight, fmtHeight, fmtInt, fmtKcal, fmtPercent, fmtTime } from "
 import { ACTIVITY_LABEL, GOAL_LABEL, LOCATION_LABEL, WEEKDAY_LONG, WEEKDAY_SHORT } from "../../lib/labels.ts";
 import { useAppState, useApplyState, useServerToday } from "../../lib/queries.ts";
 import { convertEquipment } from "../../lib/units.ts";
+import { shoppingDayOf } from "../../lib/week.ts";
 
 export function SettingsPage() {
   const { data: state } = useAppState();
@@ -54,7 +55,8 @@ export function SettingsPage() {
       `${profile.training.days.map((d) => WEEKDAY_SHORT[d] ?? "").join(", ")} at ${fmtTime(profile.training.workoutTime)}, ${profile.training.sessionMinutes} min, ${LOCATION_LABEL[profile.training.defaultLocation].toLowerCase()}`,
     ],
     ["Meals", `${profile.nutrition.mealsPerDay} a day, ${profile.nutrition.dietStyle}`],
-    ["Check-in", WEEKDAY_LONG[profile.schedule.checkInDay] ?? ""],
+    ["Week starts", WEEKDAY_LONG[profile.schedule.checkInDay] ?? ""],
+    ["Grocery day", WEEKDAY_LONG[shoppingDayOf(profile.schedule)] ?? ""],
   ];
 
   return (

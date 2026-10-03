@@ -84,8 +84,14 @@ enum Fmt {
         return number(weight, decimals: 2)
     }
 
+    /// "$4.50", "$18.00"
     static func usd(_ value: Double) -> String {
-        value.formatted(.currency(code: "USD").precision(.fractionLength(value.rounded() == value && value >= 10 ? 0 : 2)))
+        value.formatted(.currency(code: "USD").precision(.fractionLength(2)))
+    }
+
+    /// "$131", for rough totals.
+    static func usdWhole(_ value: Double) -> String {
+        value.rounded().formatted(.currency(code: "USD").precision(.fractionLength(0)))
     }
 
     static func kcal(_ value: Double) -> String { "\(integer(value)) kcal" }

@@ -15,6 +15,7 @@ import { fmtBodyWeight, fmtDateShort, fmtKcal, fmtRate } from "../../lib/format.
 import { WEEKDAY_LONG } from "../../lib/labels.ts";
 import { collapseVariants, easeOut } from "../../lib/motion.ts";
 import { keys, useCheckinStatus, useCheckins, useProfile, useUnits } from "../../lib/queries.ts";
+import { planReadyDay } from "../../lib/week.ts";
 
 const kcalChange = (kcal: number) => {
   const n = Math.round(kcal);
@@ -98,7 +99,7 @@ export function CheckInList() {
   if (q.data.length === 0) {
     return (
       <EmptyState icon={ClipboardCheck} title="No check-ins yet">
-        They run each {WEEKDAY_LONG[profile.schedule.checkInDay]}, when a new plan week starts.
+        They run automatically {WEEKDAY_LONG[planReadyDay(profile.schedule)]} evening, along with next week's meal plan.
       </EmptyState>
     );
   }

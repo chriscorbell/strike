@@ -26,6 +26,7 @@ import {
   WEEKDAY_LONG,
   WEEKDAY_SHORT,
 } from "../../../lib/labels.ts";
+import { shoppingDayOf } from "../../../lib/week.ts";
 import { STEP_LABEL, TAPE_KEYS, TAPE_LABEL, draftHeightCm, localToday, type StepId } from "../model.ts";
 import { WEEK_ORDER, tzLabel } from "../shared.ts";
 import type { StepProps } from "./types.ts";
@@ -160,7 +161,8 @@ export function ReviewStep({ draft: d, mode, goTo, currentWeightKg }: StepProps)
         <Row label="Activity">{ACTIVITY_LABEL[d.activityLevel].label}</Row>
         <Row label="Wake up">{fmtTimeSafe(d.schedule.wakeTime)}</Row>
         <Row label="Bedtime">{fmtTimeSafe(d.schedule.sleepTime)}</Row>
-        <Row label="Check-in">{WEEKDAY_LONG[d.schedule.checkInDay]}</Row>
+        <Row label="Week starts">{WEEKDAY_LONG[d.schedule.checkInDay]}</Row>
+        <Row label="Grocery day">{WEEKDAY_LONG[shoppingDayOf(d.schedule)]}</Row>
       </Block>
 
       <Block step="training" onEdit={goTo}>

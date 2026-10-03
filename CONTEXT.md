@@ -13,9 +13,13 @@
 | **Feedback** | Per muscle per session: soreness, pump, workload, joint pain. It adds or removes sets on the same day next week. |
 | **Targets** | Daily calories and macros for training days and rest days, with the maintenance estimate behind them. Versioned by effective date. |
 | **Trend weight** | Exponentially smoothed daily weigh-ins (10% per weigh-in). Its 14-day slope is the measured rate of change. |
-| **Plan week** | Seven days starting on the check-in weekday. Menus and check-ins belong to a plan week. |
-| **Check-in** | The weekly review: trend vs goal rate, the calorie adjustment, training and meal adherence, and the coach's note. |
-| **Menu** | A plan week's meal options: for each **slot** of a training day and a rest day, home-cooked and grab-and-go **options** sized to the slot's macro targets, plus a grocery list. |
+| **Plan week** | Seven days starting on the profile's week-start day (`schedule.checkInDay`). Menus and check-ins belong to a plan week. |
+| **Shopping day** | The day before a plan week starts unless set otherwise (`schedule.shoppingDay`). One grocery trip covers the week. |
+| **Prep evening** | 18:00 the evening before shopping day, when the week's check-in runs and the coach writes its meal plan, so the grocery list is ready before the trip. |
+| **Check-in** | The weekly review on the prep evening: trend vs goal rate, the calorie adjustment for the coming week, training and meal adherence, and the coach's note. |
+| **Menu** | A plan week's meals: for each **slot** of a training day and a rest day, home-cooked and grab-and-go **options** sized to the slot's macro targets, and the **plan**. |
+| **Plan** | One option per meal per day, built from a few batch-cooked dishes. Swapping a planned meal changes the grocery list. |
+| **Grocery list** | The plan's home-cooked ingredients, totaled per **catalog** item (how a store sells it) and rounded to packages; **staples** are listed to check, not buy. |
 | **Slot** | One meal in a day's plan, with a time, a role (regular, pre-workout, post-workout, bedtime) and macro targets. |
 | **Coach** | Claude, called through the Agent SDK on the Claude subscription. It writes blocks, menus, extra options, meal estimates and check-in notes as background **jobs**. |
 | **Fallback** | The rule-based planner and meal generator used when the coach is off or fails, so there is always a plan. |

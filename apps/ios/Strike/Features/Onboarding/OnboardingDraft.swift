@@ -77,7 +77,7 @@ struct OnboardingDraft: Hashable, Sendable {
                 limitations: ""
             ),
             equipment: defaultEquipment(for: .lb),
-            schedule: .init(wakeTime: "07:00", sleepTime: "23:00", checkInDay: 1),
+            schedule: .init(wakeTime: "07:00", sleepTime: "23:00", checkInDay: 0),
             nutrition: .init(
                 mealsPerDay: 4,
                 dietStyle: .omnivore,
@@ -398,7 +398,7 @@ extension OnboardingDraft {
             let places = Location.allCases.filter { p.equipment[$0].available }.map(\.displayName)
             return places.isEmpty ? "Nothing available" : places.joined(separator: " and ")
         case .food:
-            return "\(p.nutrition.mealsPerDay) meals · \(p.nutrition.dietStyle.displayName) · \(Fmt.usd(p.nutrition.weeklyBudgetUsd)) a week"
+            return "\(p.nutrition.mealsPerDay) meals · \(p.nutrition.dietStyle.displayName) · \(Fmt.usdWhole(p.nutrition.weeklyBudgetUsd)) a week"
         case .review:
             return ""
         }

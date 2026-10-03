@@ -40,9 +40,15 @@ struct TimelineMeal: Codable, Hashable, Sendable {
     var label: String
     var role: MealRole
     var targets: Macros
-    /// Ordered so the featured option for the day comes first.
+    /// The planned dish first, then the other options for this meal.
     var options: [MealOption]
+    /// The option the week's plan assigns to this meal; nil without a plan.
+    var plannedOptionId: String?
     var log: MealLog?
+
+    var plannedOption: MealOption? {
+        plannedOptionId.flatMap { id in options.first { $0.id == id } }
+    }
 }
 
 struct TimelineWorkout: Codable, Hashable, Sendable {
@@ -140,6 +146,8 @@ struct TodayResponse: Codable, Sendable {
     /// Coach jobs still queued or running.
     var pendingJobs: [Job]
     var menuReady: Bool
+    /// Next plan week, from the evening before shopping day until it starts.
+    var upcomingWeek: UpcomingWeek?
 
     var meals: [TimelineMeal] {
         timeline.compactMap { if case let .meal(meal) = $0 { meal } else { nil } }
@@ -148,6 +156,16 @@ struct TodayResponse: Codable, Sendable {
     var workout: TimelineWorkout? {
         timeline.lazy.compactMap { if case let .workout(workout) = $0 { workout } else { nil } }.first
     }
+}
+
+struct UpcomingWeek: Codable, Hashable, Sendable {
+    var weekStart: LocalDate
+    var shoppingDate: LocalDate
+    var ready: Bool
+    var menuId: Int?
+    /// Items to buy, not counting pantry staples.
+    var itemCount: Int
+    var costUsd: Double
 }
 
 struct WeightPoint: Codable, Hashable, Sendable {

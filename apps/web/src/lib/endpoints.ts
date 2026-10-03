@@ -11,6 +11,7 @@ import type {
   MealHistoryDay,
   MealLog,
   MealLogRequest,
+  MealMenu,
   Measurements,
   MeasurementEntry,
   MenuResponse,
@@ -32,6 +33,8 @@ const q = (params: Record<string, string | number | undefined>) => {
   const str = s.toString();
   return str ? `?${str}` : "";
 };
+
+export type MenuWeek = "current" | "next";
 
 export interface HealthResponse {
   ok: true;
@@ -91,8 +94,12 @@ export const endpoints = {
   exerciseHistory: (id: string) => api<ExerciseHistoryResponse>(`/exercises/${encodeURIComponent(id)}/history`),
 
   // Meals
-  menu: () => api<MenuResponse>("/menu"),
-  regenerateMenu: (note?: string) => api<Job>("/menu/regenerate", { method: "POST", body: { note } }),
+  menu: (week: MenuWeek = "current") => api<MenuResponse>(`/menu${q({ week })}`),
+  regenerateMenu: (note?: string, week: MenuWeek = "current") =>
+    api<Job>("/menu/regenerate", { method: "POST", body: { note, week } }),
+  /** Put a different option on one meal of the plan; the grocery list follows. */
+  setPlanMeal: (menuId: number, body: { date: string; slotIndex: number; optionId: string }) =>
+    api<MealMenu>(`/menu/${menuId}/plan`, { method: "PUT", body }),
   logMeal: (body: MealLogRequest) => api<MealLog>("/meals/log", { method: "POST", body }),
   deleteMealLog: (id: number) => api<{ ok: true }>(`/meals/log/${id}`, { method: "DELETE" }),
   mealHistory: (days = 14) => api<MealHistoryDay[]>(`/meals/history${q({ days })}`),

@@ -1,6 +1,6 @@
 // Rule-based meal options for when the coach is unavailable (and for mock mode). Portions are solved
 // from simple foods so each option's macros land near its slot's targets.
-import type { Macros, MealOption, MealRole, Profile } from "@strike/core";
+import type { GroceryCatalogItem, Macros, MealOption, MealRole, Profile } from "@strike/core";
 
 interface Food {
   name: string;
@@ -61,6 +61,62 @@ const F = {
   almonds: g("almonds", 21, 22, 50, 7, "Pantry", 40),
   veg: g("frozen broccoli or mixed vegetables", 3, 7, 0.3, 1.5, "Frozen"),
 };
+
+/** How each food is bought: unit, purchase units per recipe unit, and the package a store sells. */
+interface Buy {
+  unit: GroceryCatalogItem["unit"];
+  pieceName?: string;
+  factor: number;
+  size: number;
+  label: string;
+  price: number;
+  staple?: boolean;
+}
+
+const b = (unit: Buy["unit"], factor: number, size: number, label: string, price: number, staple = false, pieceName?: string): Buy => ({ unit, factor, size, label, price, staple, pieceName });
+
+const BUY: Record<keyof typeof F, Buy> = {
+  chicken: b("g", 1, 1360, "3 lb family pack", 10.5),
+  turkey: b("g", 1, 454, "1 lb pack", 5.5),
+  beef: b("g", 1, 454, "1 lb pack", 6.5),
+  salmon: b("g", 1, 454, "1 lb of fillets", 10),
+  tuna: b("piece", 1 / 113, 1, "5 oz can", 1.5, false, "cans"),
+  eggWhites: b("g", 1, 907, "32 oz carton", 6),
+  greekYogurt: b("g", 1, 907, "32 oz tub", 5.5),
+  cottage: b("g", 1, 680, "24 oz tub", 4.5),
+  tofu: b("g", 1, 397, "14 oz block", 2.5),
+  tempeh: b("g", 1, 227, "8 oz pack", 3.5),
+  whey: b("piece", 1, 30, "2 lb tub (30 scoops)", 30, true, "scoops"),
+  plantProtein: b("piece", 1, 25, "tub (25 scoops)", 30, true, "scoops"),
+  eggs: b("piece", 1, 12, "dozen", 3.5, false, "eggs"),
+  // Recipes use cooked rice and pasta; stores sell them dry.
+  rice: b("g", 1 / 3, 2268, "5 lb bag", 6, true),
+  potato: b("g", 1, 2268, "5 lb bag", 5),
+  pasta: b("g", 1 / 2.4, 454, "1 lb box", 1.6),
+  oats: b("g", 1, 1190, "42 oz canister", 5, true),
+  berries: b("g", 1, 1360, "3 lb frozen bag", 9),
+  toast: b("piece", 1, 20, "loaf", 3, false, "slices"),
+  bagel: b("piece", 1, 6, "6-pack", 4, false, "bagels"),
+  banana: b("piece", 1, 1, "banana", 0.3, false, "bananas"),
+  tortilla: b("piece", 1, 8, "8-pack", 3.5, false, "tortillas"),
+  riceCakes: b("piece", 1, 14, "pack of 14", 3, false, "rice cakes"),
+  oil: b("ml", 15, 500, "500 ml bottle", 7, true),
+  pb: b("g", 16, 454, "16 oz jar", 3.5, true),
+  avocado: b("piece", 1, 1, "avocado", 1.2, false, "avocados"),
+  cheese: b("g", 1, 227, "8 oz bag", 3),
+  almonds: b("g", 1, 454, "16 oz bag", 7),
+  veg: b("g", 1, 907, "32 oz frozen bag", 4),
+};
+
+const KEY = new Map(Object.entries(F).map(([key, food]) => [food, key as keyof typeof F]));
+
+export function fallbackCatalog(): GroceryCatalogItem[] {
+  return Object.entries(F).map(([key, food]) => {
+    const buy = BUY[key as keyof typeof F];
+    const name = food.name.replace(/ \((raw|raw weight|dry)\)$/, "").replace(/^cooked /, "");
+    return { id: key, name: name.charAt(0).toUpperCase() + name.slice(1), section: food.section, unit: buy.unit, pieceName: buy.pieceName, packageSize: buy.size, packageLabel: buy.label, packagePrice: buy.price, staple: buy.staple ?? false };
+  });
+}
 
 interface Template {
   /** Breakfast food, offered first at breakfast and not later in the day. */
@@ -162,7 +218,10 @@ function fit(t: Template, target: Macros) {
   const c = items.reduce((a, [fd, q]) => a + fd.c * q, 0);
   const f = items.reduce((a, [fd, q]) => a + fd.f * q, 0);
   return {
-    ingredients: items.map(([fd, q]) => ({ item: fd.name, amount: describe(fd, q) })),
+    ingredients: items.map(([fd, q]) => {
+      const key = KEY.get(fd)!;
+      return { item: fd.name, amount: describe(fd, q), groceryId: key, quantity: Math.round(q * BUY[key].factor * 100) / 100 };
+    }),
     macros: { kcal: Math.round(p * 4 + c * 4 + f * 9), proteinG: Math.round(p), carbsG: Math.round(c), fatG: Math.round(f) },
     costUsd: Math.round(items.reduce((a, [fd, q]) => a + fd.costPerUnit * q, 0) * 100) / 100,
     grocery: items,
@@ -222,28 +281,4 @@ export function fallbackOptions(profile: Profile, role: MealRole, target: Macros
     macros: o.macros,
   }));
   return [...home, ...out];
-}
-
-/** A rough weekly grocery list from the home options, assuming each slot's first home option on its days. */
-export function fallbackGroceries(options: { option: MealOption; timesPerWeek: number }[]) {
-  const totals = new Map<string, { qty: number; unit: string; section: string; cost: number }>();
-  const byName = new Map(Object.values(F).map((f) => [f.name, f]));
-  for (const { option, timesPerWeek } of options) {
-    if (option.kind !== "home") continue;
-    for (const ing of option.ingredients) {
-      const food = byName.get(ing.item);
-      if (!food) continue;
-      const qty = Number.parseFloat(ing.amount) * timesPerWeek;
-      const prev = totals.get(food.name) ?? { qty: 0, unit: food.unit, section: food.section, cost: 0 };
-      prev.qty += qty;
-      prev.cost += qty * food.costPerUnit;
-      totals.set(food.name, prev);
-    }
-  }
-  return [...totals.entries()].map(([item, t]) => ({
-    item,
-    quantity: t.unit === "g" ? (t.qty >= 450 ? `${(t.qty / 453.6).toFixed(1)} lb` : `${Math.round(t.qty)} g`) : `${Math.ceil(t.qty)} ${t.unit === "piece" ? "" : t.unit}`.trim(),
-    section: t.section,
-    costUsd: Math.round(t.cost * 100) / 100,
-  }));
 }

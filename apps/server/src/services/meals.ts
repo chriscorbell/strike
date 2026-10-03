@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import {
   addDays,
+  computeGroceries,
   daysBetween,
   planMeals,
+  planWeekStart,
   sumMacros,
-  weekStartOn,
   weekdayOf,
   type DayType,
   type MealHistoryDay,
@@ -16,17 +17,59 @@ import {
   type PlannedMeal,
   type Profile,
 } from "@strike/core";
-import { db, schema } from "../db/index.ts";
+import { db, schema, type MenuData } from "../db/index.ts";
 import { HttpError, notFound } from "../http.ts";
 import { requireProfile, targetsOn, today } from "./profile.ts";
 import { sessionOnDate } from "./training.ts";
 
-type MenuRow = typeof schema.menus.$inferSelect;
+export type MenuRow = typeof schema.menus.$inferSelect;
 
-export const planWeekStart = (profile: Profile, date: string) => weekStartOn(date, profile.schedule.checkInDay);
+export { planWeekStart };
 
-export function toMenu(row: MenuRow): MealMenu {
-  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, ...row.data };
+/** The menu as clients see it, with the grocery list totaled from the current plan. */
+export function toMenu(row: MenuRow, profile: Profile = requireProfile()): MealMenu {
+  const { slots, plan = [], catalog, groceryList: legacy = [], prepTips, coachNote } = row.data;
+  const normalized = slots.map((s) => ({
+    ...s,
+    options: s.options.map((o) => ({ ...o, ingredients: o.ingredients.map((i) => ({ ...i, groceryId: i.groceryId ?? null, quantity: i.quantity ?? null })) })),
+  }));
+  const groceryList = catalog
+    ? computeGroceries(catalog, normalized, plan, profile.units)
+    : legacy.map((g) => ({ ...g, needed: null, staple: false }));
+  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, slots: normalized, plan, groceryList, prepTips, coachNote };
+}
+
+/** The menu written for exactly this plan week, if any. */
+export function menuRowForWeek(weekStart: string): MenuRow | undefined {
+  return db.select().from(schema.menus).where(eq(schema.menus.weekStart, weekStart)).orderBy(desc(schema.menus.id)).get();
+}
+
+function menuRowById(id: number): MenuRow {
+  const row = db.select().from(schema.menus).where(eq(schema.menus.id, id)).get();
+  if (!row) throw notFound("Menu");
+  return row;
+}
+
+/** Point one planned meal at a different option; the grocery list follows. */
+export function setPlannedOption(menuId: number, date: string, slotIndex: number, optionId: string): MealMenu {
+  const row = menuRowById(menuId);
+  const data = structuredClone(row.data);
+  const option = data.slots.flatMap((s) => s.options).find((o) => o.id === optionId);
+  if (!option) throw new HttpError(400, "That option isn't on this menu.");
+  const day = data.plan?.find((d) => d.date === date);
+  if (!day) throw new HttpError(400, "That day isn't in this menu's plan.");
+  const meal = day.meals.find((m) => m.slotIndex === slotIndex);
+  if (meal) meal.optionId = optionId;
+  else day.meals.push({ slotIndex, optionId });
+  db.update(schema.menus).set({ data }).where(eq(schema.menus.id, menuId)).run();
+  return toMenu({ ...row, data });
+}
+
+/** The planned option for a meal, looked up across the whole menu (the day may have changed type). */
+export function plannedOptionFor(menu: MealMenu | null, date: string, slotIndex: number): MealOption | null {
+  const id = menu?.plan.find((d) => d.date === date)?.meals.find((m) => m.slotIndex === slotIndex)?.optionId;
+  if (!id || !menu) return null;
+  return menu.slots.flatMap((s) => s.options).find((o) => o.id === id) ?? null;
 }
 
 /** The menu for the plan week holding `date`, or the most recent earlier one while a new one is built. */
@@ -43,11 +86,11 @@ export function hasMenuForWeek(profile: Profile, date: string): boolean {
   return db.select().from(schema.menus).where(eq(schema.menus.weekStart, planWeekStart(profile, date))).get() != null;
 }
 
-export function saveMenu(weekStart: string, source: "coach" | "fallback", data: MenuRow["data"]): MenuRow {
+export function saveMenu(weekStart: string, source: "coach" | "fallback", data: MenuData): MenuRow {
   return db.insert(schema.menus).values({ weekStart, source, data }).returning().get();
 }
 
-export function updateMenuData(id: number, data: MenuRow["data"]) {
+export function updateMenuData(id: number, data: MenuData) {
   db.update(schema.menus).set({ data }).where(eq(schema.menus.id, id)).run();
 }
 

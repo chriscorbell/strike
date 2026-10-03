@@ -61,6 +61,9 @@ final class AppModel {
     var activeWorkout: WorkoutStore?
     var isWorkoutPresented = false
     var isSettingsPresented = false
+    var selectedTab: AppTab = .today
+    /// Where the Meals tab should open next, e.g. next week's groceries from Today's card.
+    var mealsFocus: MealsFocus?
     /// Bumped whenever coach jobs finish, so screens showing coach output can reload.
     private(set) var coachJobsTick = 0
 
@@ -256,6 +259,12 @@ final class AppModel {
     func closeWorkout() {
         isWorkoutPresented = false
         activeWorkout = nil
+    }
+
+    /// Switches to Meals on a given week and section.
+    func showMeals(week: MenuWeek, section: MealsSection) {
+        mealsFocus = MealsFocus(week: week, section: section)
+        selectedTab = .meals
     }
 
     func coachJobsChanged() {

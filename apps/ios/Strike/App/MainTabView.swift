@@ -6,7 +6,6 @@ enum AppTab: Hashable {
 
 struct MainTabView: View {
     @Environment(AppModel.self) private var app
-    @State private var tab: AppTab = .today
 
     /// The screen stays on while a workout is open or in progress, even when minimized.
     private var keepAwake: Bool {
@@ -16,7 +15,7 @@ struct MainTabView: View {
 
     var body: some View {
         @Bindable var app = app
-        TabView(selection: $tab) {
+        TabView(selection: $app.selectedTab) {
             Tab("Today", systemImage: "sun.max.fill", value: AppTab.today) {
                 TodayView()
             }

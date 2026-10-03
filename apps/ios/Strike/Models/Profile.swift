@@ -104,8 +104,14 @@ struct Profile: Codable, Hashable, Sendable {
     struct Schedule: Codable, Hashable, Sendable {
         var wakeTime: TimeOfDay
         var sleepTime: TimeOfDay
-        /// The weekly check-in day, which is also the first day of each plan week.
+        /// The first day of each plan week. The check-in and next week's meal plan are prepared ahead of it.
         var checkInDay: Weekday
+        /// Grocery day for the coming plan week; nil means the day before the week starts. Optional on
+        /// the wire, so nil is omitted rather than sent as null.
+        var shoppingDay: Weekday?
+
+        /// The grocery day in effect.
+        var effectiveShoppingDay: Weekday { shoppingDay ?? (checkInDay + 6) % 7 }
     }
 
     struct Nutrition: Codable, Hashable, Sendable {

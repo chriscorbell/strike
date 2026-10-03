@@ -50,6 +50,22 @@ final class NotificationService {
                 try? await center.add(request)
             }
         }
+        if let week = days.first?.upcomingWeek, let request = groceryRequest(for: week, after: now) {
+            try? await center.add(request)
+        }
+    }
+
+    /// 9:00 on grocery day, once next week's plan and list are ready.
+    private func groceryRequest(for week: UpcomingWeek, after now: Date) -> UNNotificationRequest? {
+        guard week.ready, let fireDate = Dates.date(at: "09:00", on: week.shoppingDate), fireDate > now else { return nil }
+        let content = UNMutableNotificationContent()
+        content.title = "Grocery day"
+        content.body = "\(week.itemCount) items, about \(Fmt.usdWhole(week.costUsd))"
+        content.sound = .default
+        content.threadIdentifier = "groceries"
+        let components = Dates.calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        return UNNotificationRequest(identifier: "\(Self.planPrefix)grocery.\(week.weekStart)", content: content, trigger: trigger)
     }
 
     func removePlanNotifications() async {

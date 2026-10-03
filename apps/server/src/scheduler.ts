@@ -1,13 +1,13 @@
-import { addDays } from "@strike/core";
+import { minutesNowIn, targetPlanWeek } from "@strike/core";
 import { checkInDue, runCheckIn } from "./services/checkins.ts";
 import { enqueue, pendingJobs } from "./services/jobs.ts";
-import { hasMenuForWeek, planWeekStart } from "./services/meals.ts";
+import { menuRowForWeek } from "./services/meals.ts";
 import { getProfile, targetsOn, today } from "./services/profile.ts";
 import { activeMeso } from "./services/training.ts";
 
 /**
- * Keep the plan stocked: a mesocycle, this week's menu, and the weekly check-in once it's a day
- * overdue (normally Chris runs it from the app on check-in day).
+ * Keep the plan stocked: a training block always, and from the evening before shopping day, the weekly
+ * check-in and next week's meal plan, so the grocery list is ready before the trip.
  */
 export function tick() {
   const profile = getProfile();
@@ -15,14 +15,14 @@ export function tick() {
   const now = today(profile);
   if (!targetsOn(now)) return;
   if (!activeMeso() && pendingJobs("mesocycle").length === 0) enqueue("mesocycle", { reason: "No active block" });
-  const weekStart = planWeekStart(profile, now);
-  if (checkInDue(now)) {
-    if (now >= addDays(weekStart, 1)) runCheckIn(null);
+  if (checkInDue()) {
+    // The check-in sets the new week's calories, then queues its meal plan.
+    runCheckIn(null);
     return;
   }
-  if (!hasMenuForWeek(profile, now) && pendingJobs("meal_menu").length === 0) enqueue("meal_menu", { weekStart, reason: "New week" });
+  const week = targetPlanWeek(profile, now, minutesNowIn(profile.timezone));
+  if (!menuRowForWeek(week) && pendingJobs("meal_menu").length === 0) enqueue("meal_menu", { weekStart: week, reason: "Plan week" });
 }
-
 export function startScheduler() {
   const run = () => {
     try {

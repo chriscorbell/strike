@@ -104,8 +104,10 @@ export const Profile = z.object({
   schedule: z.object({
     wakeTime: TimeOfDay,
     sleepTime: TimeOfDay,
-    /** The weekly check-in day, which is also the first day of each plan week. */
+    /** The first day of each plan week. The weekly check-in and next week's meal plan are prepared ahead of it. */
     checkInDay: Weekday,
+    /** Grocery day for the coming plan week; defaults to the day before the week starts. */
+    shoppingDay: Weekday.optional(),
   }),
   nutrition: z.object({
     mealsPerDay: z.number().int().min(3).max(6),
@@ -176,7 +178,17 @@ export const MealOption = z.object({
   place: z.string().nullable(),
   /** Exactly what to order or grab, for kind "out". */
   order: z.string().nullable(),
-  ingredients: z.array(z.object({ item: z.string(), amount: z.string() })),
+  ingredients: z.array(
+    z.object({
+      item: z.string(),
+      /** As written in the recipe, e.g. "1 1/2 cups (340 g)". */
+      amount: z.string(),
+      /** The grocery item it is bought as, for totaling the week's shopping. */
+      groceryId: z.string().nullable(),
+      /** Amount in that grocery item's unit, as purchased (raw weight, dry rice). */
+      quantity: z.number().nullable(),
+    }),
+  ),
   steps: z.array(z.string()),
   prepMinutes: z.number(),
   costUsd: z.number(),
@@ -194,13 +206,42 @@ export const MenuSlot = z.object({
 });
 export type MenuSlot = z.infer<typeof MenuSlot>;
 
+/** One thing to buy, totaled from the planned meals. */
 export const GroceryItem = z.object({
   item: z.string(),
+  /** What to buy, e.g. "2 x 32 oz tub". */
   quantity: z.string(),
+  /** How much the plan uses, e.g. "about 3.4 lb"; null when untracked. */
+  needed: z.string().nullable(),
   section: z.string(),
   costUsd: z.number(),
+  /** A pantry item most kitchens already have: check before buying. */
+  staple: z.boolean(),
 });
 export type GroceryItem = z.infer<typeof GroceryItem>;
+
+/** How a grocery item is sold: the coach writes these once per menu. */
+export const GroceryCatalogItem = z.object({
+  id: z.string(),
+  name: z.string(),
+  section: z.string(),
+  unit: z.enum(["g", "ml", "piece"]),
+  /** For piece items, the plural noun for one unit: "slices", "cans", "eggs". */
+  pieceName: z.string().optional(),
+  packageSize: z.number().positive(),
+  packageLabel: z.string(),
+  packagePrice: z.number().min(0),
+  staple: z.boolean(),
+});
+export type GroceryCatalogItem = z.infer<typeof GroceryCatalogItem>;
+
+/** The planned dish for each meal of one day. */
+export const PlanDay = z.object({
+  date: LocalDate,
+  dayType: DayType,
+  meals: z.array(z.object({ slotIndex: z.number().int().min(0), optionId: z.string() })),
+});
+export type PlanDay = z.infer<typeof PlanDay>;
 
 export const MealMenu = z.object({
   id: z.number(),
@@ -208,6 +249,9 @@ export const MealMenu = z.object({
   createdAt: z.string(),
   source: z.enum(["coach", "fallback"]),
   slots: z.array(MenuSlot),
+  /** One entry per remaining day of the week, each meal pointing at one of its slot's options. Empty on menus from before planning. */
+  plan: z.array(PlanDay),
+  /** Totaled from the plan's home-cooked meals. */
   groceryList: z.array(GroceryItem),
   prepTips: z.array(z.string()),
   coachNote: z.string(),

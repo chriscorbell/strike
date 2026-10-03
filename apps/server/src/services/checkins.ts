@@ -1,8 +1,21 @@
 import { desc, eq } from "drizzle-orm";
-import { addDays, applyAdjustment, daysBetween, targetRateKgPerWeek, weekdayOf, weeklyAdjustment, type CheckIn } from "@strike/core";
+import {
+  addDays,
+  applyAdjustment,
+  daysBetween,
+  minutesNowIn,
+  prepMomentFor,
+  targetPlanWeek,
+  targetRateKgPerWeek,
+  todayIn,
+  weekdayOf,
+  weeklyAdjustment,
+  type CheckIn,
+  type Profile,
+} from "@strike/core";
 import { db, schema } from "../db/index.ts";
 import { enqueue } from "./jobs.ts";
-import { mealAdherence, planWeekStart } from "./meals.ts";
+import { mealAdherence } from "./meals.ts";
 import { bodyStats, onboardedAt, requireProfile, saveTargets, targetsOn, today } from "./profile.ts";
 import { sessionsInRange } from "./training.ts";
 import { trendThrough } from "./weights.ts";
@@ -35,13 +48,21 @@ export function latestCheckIn(): CheckIn | null {
   return r ? toCheckIn(r) : null;
 }
 
-/** Due once a plan week starts, if onboarding happened before that week began. */
-export function checkInDue(date = today()): boolean {
+/** The plan week a check-in run now belongs to: next week once its prep evening has come, else this one. */
+export function checkInWeek(profile: Profile = requireProfile()): string {
+  return targetPlanWeek(profile, today(profile), minutesNowIn(profile.timezone));
+}
+
+/**
+ * Due from the evening before shopping day (when next week's plan is prepared) until done, unless
+ * onboarding happened on or after that day, when there's no week to review yet.
+ */
+export function checkInDue(): boolean {
   const profile = requireProfile();
-  const start = planWeekStart(profile, date);
+  const week = checkInWeek(profile);
   const onboarded = onboardedAt();
-  if (!onboarded || onboarded.slice(0, 10) >= start) return false;
-  return db.select().from(schema.checkins).where(eq(schema.checkins.weekStart, start)).get() == null;
+  if (!onboarded || todayIn(profile.timezone, new Date(onboarded)) >= prepMomentFor(profile, week).date) return false;
+  return db.select().from(schema.checkins).where(eq(schema.checkins.weekStart, week)).get() == null;
 }
 
 /**
@@ -51,7 +72,7 @@ export function checkInDue(date = today()): boolean {
 export function runCheckIn(userNote: string | null): CheckIn {
   const profile = requireProfile();
   const now = today(profile);
-  const weekStart = planWeekStart(profile, now);
+  const weekStart = checkInWeek(profile);
   const existing = db.select().from(schema.checkins).where(eq(schema.checkins.weekStart, weekStart)).get();
   if (existing) {
     if (userNote) db.update(schema.checkins).set({ userNote }).where(eq(schema.checkins.id, existing.id)).run();
@@ -59,7 +80,8 @@ export function runCheckIn(userNote: string | null): CheckIn {
   }
 
   const prevStart = addDays(weekStart, -7);
-  const prevEnd = addDays(weekStart, -1);
+  // The review covers the week leading up to the new one, as far as it has happened.
+  const prevEnd = addDays(weekStart, -1) < now ? addDays(weekStart, -1) : now;
   const { entries, latest, rate } = trendThrough(now);
   const recent = entries.filter((e) => e.date > addDays(now, -7)).length;
   const daysOfData = entries.length ? daysBetween(entries[0]!.date, now) : 0;

@@ -1,7 +1,20 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { DayType, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
+import type { DayType, GroceryCatalogItem, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
 
 const now = () => new Date().toISOString();
+
+/**
+ * A stored menu. `plan` and `catalog` arrived with day-by-day planning; older rows lack them and keep
+ * the coach's own `groceryList`.
+ */
+export interface MenuData {
+  slots: MealMenu["slots"];
+  plan?: MealMenu["plan"];
+  catalog?: GroceryCatalogItem[];
+  groceryList?: { item: string; quantity: string; section: string; costUsd: number }[];
+  prepTips: string[];
+  coachNote: string;
+}
 
 /** A single row: Strike has one user. */
 export const profile = sqliteTable("profile", {
@@ -122,7 +135,7 @@ export const menus = sqliteTable("menus", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   weekStart: text("week_start").notNull(),
   source: text("source", { enum: ["coach", "fallback"] }).notNull(),
-  data: text("data", { mode: "json" }).$type<Pick<MealMenu, "slots" | "groceryList" | "prepTips" | "coachNote">>().notNull(),
+  data: text("data", { mode: "json" }).$type<MenuData>().notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
 });
 

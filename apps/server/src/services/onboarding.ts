@@ -1,4 +1,4 @@
-import { initialTargets, navyBodyFat, type Measurements, type OnboardingRequest, type Profile, type StateResponse } from "@strike/core";
+import { daysBetween, initialTargets, minutesNowIn, navyBodyFat, targetPlanWeek, type Measurements, type OnboardingRequest, type Profile, type StateResponse } from "@strike/core";
 import { eq } from "drizzle-orm";
 import { db, schema } from "../db/index.ts";
 import { coachEnabled } from "../coach/claude.ts";
@@ -32,8 +32,14 @@ export function onboard(req: OnboardingRequest): StateResponse {
   if (req.measurements && Object.values(req.measurements).some((v) => v != null)) addMeasurements(profile, date, req.measurements);
   saveTargets(initialTargets({ stats: bodyStats(profile, req.weightKg, date), profile, effectiveDate: date }));
   enqueue("mesocycle", { reason: "Onboarding" });
-  if (coachEnabled()) saveStarterMenu(profile, date);
-  enqueue("meal_menu", { weekStart: planWeekStart(profile, date), reason: "Onboarding" });
+  // Meals for today straight away; the coach then plans this week, or next week when this one is
+  // nearly over or next week's prep evening has already come.
+  const current = planWeekStart(profile, date);
+  saveStarterMenu(profile, current);
+  const target = targetPlanWeek(profile, date, minutesNowIn(profile.timezone));
+  const daysLeft = 7 - daysBetween(current, date);
+  if (target !== current) enqueue("meal_menu", { weekStart: target, reason: "Onboarding" });
+  else if (daysLeft > 2) enqueue("meal_menu", { weekStart: current, reason: "Onboarding" });
   return state();
 }
 

@@ -38,8 +38,10 @@ struct MealSlotView: View {
     }
 
     private func content(_ meal: TimelineMeal) -> some View {
-        let home = meal.options.filter { $0.kind == .home }
-        let out = meal.options.filter { $0.kind == .out }
+        let planned = meal.plannedOption
+        let others = meal.options.filter { $0.id != planned?.id }
+        let home = others.filter { $0.kind == .home }
+        let out = others.filter { $0.kind == .out }
         let busy = store.busySlots.contains(meal.slotIndex)
         let findingMore = store.optionJobSlots.contains(meal.slotIndex)
 
@@ -52,11 +54,18 @@ struct MealSlotView: View {
                         .transition(.scale(scale: 0.96).combined(with: .opacity))
                 }
 
-                if !home.isEmpty {
-                    optionSection("Cook at home", systemImage: "frying.pan", options: home, meal: meal, busy: busy)
-                }
-                if !out.isEmpty {
-                    optionSection("Grab and go", systemImage: "bag", options: out, meal: meal, busy: busy)
+                if let planned {
+                    plannedCard(planned, meal: meal, busy: busy)
+                    if !others.isEmpty {
+                        optionSection("Other options", systemImage: "square.grid.2x2", options: home + out, meal: meal, busy: busy)
+                    }
+                } else {
+                    if !home.isEmpty {
+                        optionSection("Cook at home", systemImage: "frying.pan", options: home, meal: meal, busy: busy)
+                    }
+                    if !out.isEmpty {
+                        optionSection("Grab and go", systemImage: "bag", options: out, meal: meal, busy: busy)
+                    }
                 }
                 if meal.options.isEmpty {
                     Text("No options yet. The coach adds them with this week's menu.")
@@ -178,6 +187,70 @@ struct MealSlotView: View {
             .disabled(busy)
         }
         .card()
+    }
+
+    /// The dish the week's plan assigns to this meal, with one-tap logging.
+    private func plannedCard(_ option: MealOption, meal: TimelineMeal, busy: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Planned", systemImage: "calendar")
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 4)
+            VStack(alignment: .leading, spacing: 14) {
+                NavigationLink(value: option) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(option.kind == .out ? "\(option.place.map { "\($0): " } ?? "")\(option.name)" : option.name)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(Color.primary)
+                                .multilineTextAlignment(.leading)
+                            if option.hasUsefulSummary {
+                                Text(option.summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            HStack(spacing: 10) {
+                                MacroLine(macros: option.macros, font: .footnote)
+                                if option.prepMinutes > 0 {
+                                    Text(Fmt.minutes(option.prepMinutes))
+                                        .font(.footnote)
+                                        .foregroundStyle(Color.secondary)
+                                }
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+
+                if meal.log == nil {
+                    Button {
+                        Task { await store.log(option, for: meal) }
+                    } label: {
+                        Group {
+                            if busy {
+                                ProgressView().tint(.white)
+                            } else {
+                                Label("Ate this", systemImage: "checkmark")
+                            }
+                        }
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(busy)
+                } else if meal.log?.optionId == option.id {
+                    Label("Logged", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+            }
+            .card()
+        }
     }
 
     private func optionSection(_ title: String, systemImage: String, options: [MealOption], meal: TimelineMeal, busy: Bool) -> some View {
