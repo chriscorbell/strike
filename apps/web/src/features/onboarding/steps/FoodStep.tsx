@@ -9,7 +9,7 @@ import type { StepProps } from "./types.ts";
 
 type Nutrition = Draft["nutrition"];
 
-const MEAL_OPTIONS = [3, 4, 5, 6].map((value) => ({ value, label: String(value) }));
+const MEAL_OPTIONS = [2, 3, 4, 5, 6].map((value) => ({ value, label: String(value) }));
 
 const DIET_OPTIONS = (Object.keys(DIET_LABEL) as Profile["nutrition"]["dietStyle"][]).map((value) => ({
   value,

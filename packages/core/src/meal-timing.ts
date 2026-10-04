@@ -48,7 +48,9 @@ export function planMeals(input: MealTimingInput): PlannedMeal[] {
   }
 
   const times = candidateTimes(wake, sleep, ws, we, n);
-  const chosen = bestSchedule(times, n, { wake, sleep, ws, we });
+  // With two meals the day is lunch and dinner: the first meal waits until about noon.
+  const firstIdeal = n <= 2 ? Math.max(wake + 45, 12 * 60) : wake + 45;
+  const chosen = bestSchedule(times, n, { wake, sleep, ws, we, firstIdeal });
   return describe(chosen, input, sleep, ws, we);
 }
 
@@ -71,12 +73,14 @@ interface Day {
   sleep: number;
   ws: number | null;
   we: number | null;
+  /** When the first meal ideally lands. */
+  firstIdeal: number;
 }
 
 const gapCost = (g: number) => (g > 240 ? (g - 240) ** 2 / 60 : 0) + (g < 150 ? (150 - g) ** 2 / 15 : 0) + g ** 2 / 2000;
 
 function firstCost(t: number, d: Day): number {
-  const off = t - (d.wake + 45);
+  const off = t - d.firstIdeal;
   let cost = off >= 0 ? (off <= 30 ? off * 0.2 : 6 + (off - 30) ** 2 / 2.5) : -off * 1.5;
   // Training before the first meal: fasted, which is fine early in the morning but costs a little,
   // and the first meal then has to be the post-workout one.

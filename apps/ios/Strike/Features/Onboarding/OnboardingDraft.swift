@@ -246,7 +246,7 @@ struct OnboardingDraft: Hashable, Sendable {
     static let weightRangeKg: ClosedRange<Double> = 30 ... 300
     static let sessionMinutesRange: ClosedRange<Int> = 20 ... 120
     static let trainingDaysRange: ClosedRange<Int> = 2 ... 6
-    static let mealsRange: ClosedRange<Int> = 3 ... 6
+    static let mealsRange: ClosedRange<Int> = 2 ... 6
     static let focusLimit = 4
 
     /// The first thing blocking `step`, phrased for the user, or nil when it's ready.
@@ -291,7 +291,7 @@ struct OnboardingDraft: Hashable, Sendable {
             }
             return nil
         case .food:
-            if !Self.mealsRange.contains(profile.nutrition.mealsPerDay) { return "Pick 3 to 6 meals a day." }
+            if !Self.mealsRange.contains(profile.nutrition.mealsPerDay) { return "Pick 2 to 6 meals a day." }
             if profile.nutrition.weeklyBudgetUsd < 0 { return "Budget can't be negative." }
             return nil
         case .review:

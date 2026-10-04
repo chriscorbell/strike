@@ -32,9 +32,19 @@ export function onJobDone(fn: (job: Job) => void) {
 }
 
 /** Kinds where one pending job is enough; asking again returns the job already waiting. */
-const SINGLETON: JobKind[] = ["mesocycle", "meal_menu", "check_in_note"];
+const SINGLETON: JobKind[] = ["mesocycle", "check_in_note"];
 
 export function enqueue(kind: JobKind, input: Record<string, unknown> = {}): Job {
+  if (kind === "meal_menu") {
+    // One pending plan per week.
+    const pending = db
+      .select()
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.kind, kind), inArray(schema.jobs.status, ["queued", "running"])))
+      .all()
+      .find((j) => (j.input.weekStart ?? null) === (input.weekStart ?? null));
+    if (pending) return toJob(pending);
+  }
   if (kind === "prep_guide") {
     // One pending guide per menu.
     const pending = db

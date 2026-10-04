@@ -110,7 +110,7 @@ export const Profile = z.object({
     shoppingDay: Weekday.optional(),
   }),
   nutrition: z.object({
-    mealsPerDay: z.number().int().min(3).max(6),
+    mealsPerDay: z.number().int().min(2).max(6),
     dietStyle: z.enum(["omnivore", "pescatarian", "vegetarian", "vegan"]),
     allergies: z.array(z.string()),
     avoidFoods: z.string(),

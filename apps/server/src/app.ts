@@ -183,9 +183,9 @@ export function createApp() {
       shoppingDate: shoppingDateFor(profile, week),
     });
   });
-  app.post("/api/menu/regenerate", json(z.object({ note: z.string().max(2000).optional(), week: z.enum(["current", "next"]).optional() })), (c) => {
+  app.post("/api/menu/regenerate", json(z.object({ note: z.string().max(2000).optional(), week: z.enum(["current", "next"]).optional(), keepGroceries: z.boolean().optional() })), (c) => {
     const body = c.req.valid("json");
-    return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, reason: "Requested" }));
+    return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, keepGroceries: body.keepGroceries ?? false, reason: "Requested" }));
   });
   app.get("/api/menus/:id", (c) => c.json(toMenu(menuRowById(id(c)))));
   app.post("/api/menu/:id/prep-guide", (c) => {

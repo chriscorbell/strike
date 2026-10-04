@@ -22,6 +22,29 @@ function formatNeeded(total: number, item: GroceryCatalogItem, units: Units): st
   return total >= 1000 ? `about ${round(total / 1000, 1)} L` : total >= 5 ? `about ${Math.round(total)} ml` : "a little";
 }
 
+/** How much of each grocery item a plan uses, in the item's unit. */
+export function groceryUsage(slots: MenuSlot[], plan: PlanDay[]): Map<string, number> {
+  const usage = new Map<string, number>();
+  for (const option of plannedOptions(slots, plan)) {
+    if (option.kind !== "home") continue;
+    for (const ing of option.ingredients) {
+      if (ing.groceryId && ing.quantity != null) usage.set(ing.groceryId, (usage.get(ing.groceryId) ?? 0) + ing.quantity);
+    }
+  }
+  return usage;
+}
+
+/** What the grocery list for a plan had you buy: whole packages of each item, in the item's unit. */
+export function purchasedAmounts(catalog: GroceryCatalogItem[], slots: MenuSlot[], plan: PlanDay[]): Map<string, number> {
+  const bought = new Map<string, number>();
+  for (const [id, total] of groceryUsage(slots, plan)) {
+    const item = catalog.find((c) => c.id === id);
+    if (!item || total <= 0) continue;
+    bought.set(id, Math.max(1, Math.ceil(total / item.packageSize - 0.03)) * item.packageSize);
+  }
+  return bought;
+}
+
 export function computeGroceries(catalog: GroceryCatalogItem[], slots: MenuSlot[], plan: PlanDay[], units: Units): GroceryItem[] {
   const totals = new Map<string, number>();
   const loose = new Map<string, string>();

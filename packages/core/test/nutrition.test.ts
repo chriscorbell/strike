@@ -90,6 +90,15 @@ describe("meal timing", () => {
     expect(new Set(meals.map((m) => m.label)).size).toBe(5);
   });
 
+  it("makes two meals lunch and dinner", () => {
+    const training = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 2, workout: { start: "19:00", minutes: 20 }, targets });
+    expect(training.map((m) => m.label)).toEqual(["Lunch", "Post-workout"]);
+    expect(toMin(training[0]!.time)).toBeGreaterThanOrEqual(toMin("11:30"));
+    const rest = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 2, workout: null, targets });
+    expect(rest.map((m) => m.label)).toEqual(["Lunch", "Dinner"]);
+    expect(rest.reduce((a, m) => a + m.targets.proteinG, 0)).toBeGreaterThanOrEqual(175);
+  });
+
   it("sums close to the daily targets", () => {
     const meals = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 4, workout: { start: "12:00", minutes: 60 }, targets });
     const p = meals.reduce((a, m) => a + m.targets.proteinG, 0);

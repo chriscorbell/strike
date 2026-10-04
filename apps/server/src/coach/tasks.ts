@@ -9,9 +9,12 @@ import {
   loadUnit,
   Location,
   Macros,
+  groceryUsage,
+  purchasedAmounts,
   shoppingDateFor,
   validateMeso,
   weekdayOf,
+  type GroceryCatalogItem,
   type MealOption,
   type MenuSlot,
   type MesoPlan,
@@ -21,7 +24,7 @@ import {
 import { env } from "../env.ts";
 import { checkInById, setCheckInCoachNote } from "../services/checkins.ts";
 import { enqueue, registerHandler } from "../services/jobs.ts";
-import { dayTypeOn, menuRowFor, menuSlotsTemplate, plannedMeals, planWeekStart, saveMenu, toMenu, updateMenuData } from "../services/meals.ts";
+import { dayTypeOn, menuRowFor, menuRowForWeek, menuSlotsTemplate, plannedMeals, planWeekStart, saveMenu, toMenu, updateMenuData } from "../services/meals.ts";
 import type { MenuData } from "../db/index.ts";
 import { requireProfile, today } from "../services/profile.ts";
 import { activeMeso, createMeso, ensureNextSession } from "../services/training.ts";
@@ -212,8 +215,42 @@ export function saveStarterMenu(profile: Profile, weekStart: string) {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** Groceries already bought for a week: the catalog and how much of each item is on hand. */
+interface OnHand {
+  catalog: GroceryCatalogItem[];
+  available: Map<string, number>;
+}
+
+function onHandFor(weekStart: string): OnHand | null {
+  const row = menuRowForWeek(weekStart);
+  if (!row?.data.catalog || !(row.data.plan ?? []).length) return null;
+  return { catalog: row.data.catalog, available: purchasedAmounts(row.data.catalog, row.data.slots, row.data.plan ?? []) };
+}
+
+function onHandText(onHand: OnHand): string {
+  const lines = onHand.catalog
+    .filter((c) => onHand.available.has(c.id) || c.staple)
+    .map((c) => {
+      const amount = onHand.available.get(c.id);
+      return `- ${c.id}: ${c.name}${c.staple ? " (pantry staple)" : ""}${amount != null ? `: ${Math.round(amount)} ${c.unit} on hand` : ""}`;
+    });
+  return ["## Groceries on hand (already bought)", ...lines].join("\n");
+}
+
+/** Items a plan would use more of than is on hand (5% leeway), or that weren't bought at all. */
+function overages(onHand: OnHand, slots: MenuSlot[], plan: PlanDay[]): string[] {
+  const out: string[] = [];
+  for (const [id, used] of groceryUsage(slots, plan)) {
+    const item = onHand.catalog.find((c) => c.id === id);
+    if (item?.staple) continue;
+    const have = onHand.available.get(id) ?? 0;
+    if (used > have * 1.05) out.push(`${item?.name ?? id}: plan uses ${Math.round(used)}${item ? ` ${item.unit}` : ""}, on hand ${Math.round(have)}`);
+  }
+  return out;
+}
+
 /** The prompt for a week's meal plan: who Chris is, what he ate, the meal slots and days, and the rules. */
-export function menuPrompt(profile: Profile, weekStart: string, dates: PlanDate[], template: Omit<MenuSlot, "options">[], note: string | null): string {
+export function menuPrompt(profile: Profile, weekStart: string, dates: PlanDate[], template: Omit<MenuSlot, "options">[], note: string | null, onHand: OnHand | null = null): string {
   const now = today(profile);
   const shopping = shoppingDateFor(profile, weekStart);
   const slotText = template
@@ -228,13 +265,16 @@ export function menuPrompt(profile: Profile, weekStart: string, dates: PlanDate[
     "## Days to plan",
     dayText,
     "## Task",
-    `Write ${profile.name}'s meal plan for ${dates.length === 7 ? "the week" : "the rest of the week"} starting ${dates[0]!.date}. ${dates[0]!.date > now ? `They shop once, on ${shopping}, for the whole week.` : "They shop today for these days."}`,
+    onHand ? onHandText(onHand) : "",
+    onHand
+      ? `Rewrite ${profile.name}'s meal plan for ${dates.length === 7 ? "the week" : "the rest of the week"} starting ${dates[0]!.date}. They already bought this week's groceries (listed above), so the plan must be cooked from them: use only those items plus pantry staples, keep each item's total within what's on hand (using less is fine), reuse the same catalog ids, and add no new grocery items.`
+      : `Write ${profile.name}'s meal plan for ${dates.length === 7 ? "the week" : "the rest of the week"} starting ${dates[0]!.date}. ${dates[0]!.date > now ? `They shop once, on ${shopping}, for the whole week.` : "They shop today for these days."}`,
     "- slots: for every slot above, 2 home options and 2 grab-and-go options, each within about 10% of the slot's targets (protein matters most).",
     "- Home options are the dishes the plan uses. Build the week from 3 to 5 distinct dishes that batch-cook well, reused across slots and days; when a dish serves two slots, it appears as an option in each with portions sized to that slot.",
     "- plan: for every date listed, one home option (by its index in that day type's slot) for every slot of its day type. Repeat dishes across days. Cooked food keeps about four days, so plan two cooking sessions (the first day and midweek); one grocery trip must cover the week, so favor food that keeps: frozen vegetables and fruit, sturdy produce, eggs, dairy, canned goods.",
-    "- catalog: every ingredient the home options use, listed once, with how a typical US grocery store sells it and the price. Mark pantry staples.",
+    onHand ? "- catalog: repeat the on-hand items you use, unchanged." : "- catalog: every ingredient the home options use, listed once, with how a typical US grocery store sells it and the price. Mark pantry staples.",
     "- Every home-option ingredient names its catalog groceryId and quantity in that item's unit, as purchased.",
-    `- Keep the week's groceries, not counting staples, within about $${profile.nutrition.weeklyBudgetUsd}. Respect the cooking time and kitchen.`,
+    onHand ? "- Respect the cooking time and kitchen." : `- Keep the week's groceries, not counting staples, within about $${profile.nutrition.weeklyBudgetUsd}. Respect the cooking time and kitchen.`,
     `- Grab-and-go options: specific orders at ${profile.nutrition.grabAndGo.join(", ") || "common chains"}, or any grocery or convenience store, with realistic nutrition and price. They're the backup for busy days and need no groceries.`,
     "- Pre-workout meals light and carb-forward; post-workout meals carb- and protein-rich; bedtime meals protein-rich.",
     "- Lean on what was actually eaten recently, and drop dishes that were skipped.",
@@ -254,10 +294,13 @@ async function menuHandler(input: Record<string, unknown>) {
   const template = menuSlotsTemplate(profile, dates[0]!.date);
   if (template.length === 0) throw new Error("No nutrition targets yet.");
   const note = typeof input.note === "string" && input.note ? input.note : null;
+  // Re-planning a week whose groceries are already bought: cook from what's on hand.
+  const onHand = input.keepGroceries === true ? onHandFor(weekStart) : null;
+  let feedback = "";
   const result = await withFallback<MenuData>(
     "meal plan",
     async () => {
-      const prompt = menuPrompt(profile, weekStart, dates, template, note);
+      const prompt = menuPrompt(profile, weekStart, dates, template, note, onHand) + feedback;
       const out = await askClaude({ label: "meal plan", system: SYSTEM, prompt, schema: MenuOut, timeoutMs: 45 * 60_000 });
       const stamp = Date.now().toString(36);
       const slots: MenuSlot[] = template.map((s) => {
@@ -277,10 +320,23 @@ async function menuHandler(input: Record<string, unknown>) {
           }),
         };
       });
+      if (onHand) {
+        const over = overages(onHand, slots, plan);
+        if (over.length && !feedback) {
+          // One more try, told exactly where it went over.
+          feedback = `\n\nYour previous plan used more than is on hand: ${over.join("; ")}. Stay within the amounts.`;
+          throw new Error(`Plan exceeded groceries on hand: ${over.join("; ")}`);
+        }
+        const catalog = [...onHand.catalog, ...out.catalog.filter((c) => !onHand.catalog.some((o) => o.id === c.id))];
+        const coachNote = over.length ? `${out.coachNote} A little extra needed: ${over.join("; ")}.` : out.coachNote;
+        return { slots, plan, catalog, prepTips: out.prepTips.slice(0, 6), coachNote } satisfies MenuData;
+      }
       return { slots, plan, catalog: out.catalog, prepTips: out.prepTips.slice(0, 6), coachNote: out.coachNote } satisfies MenuData;
     },
     () => fallbackMenu(profile, template, weekStart, dates),
   );
+  // A rule-based plan would need new groceries; keep the current plan instead.
+  if (onHand && result.source === "fallback") throw new Error(`Couldn't re-plan from the groceries on hand, so the current plan stays. ${result.reason ?? ""}`.trim());
   const row = saveMenu(weekStart, result.source, result.value);
   // The detailed prep guide is written from the finished plan, as its own job.
   enqueue("prep_guide", { menuId: row.id });

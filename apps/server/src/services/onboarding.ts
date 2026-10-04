@@ -1,10 +1,10 @@
-import { daysBetween, initialTargets, minutesNowIn, navyBodyFat, targetPlanWeek, type Measurements, type OnboardingRequest, type Profile, type StateResponse } from "@strike/core";
+import { addDays, daysBetween, initialTargets, shoppingDateFor, minutesNowIn, navyBodyFat, targetPlanWeek, type Measurements, type OnboardingRequest, type Profile, type StateResponse } from "@strike/core";
 import { eq } from "drizzle-orm";
 import { db, schema } from "../db/index.ts";
 import { coachEnabled } from "../coach/claude.ts";
 import { saveStarterMenu } from "../coach/tasks.ts";
 import { enqueue } from "./jobs.ts";
-import { planWeekStart } from "./meals.ts";
+import { menuRowForWeek, planWeekStart } from "./meals.ts";
 import { bodyStats, getProfile, saveProfile, saveTargets, targetsOn, today } from "./profile.ts";
 import { currentWeightKg, upsertWeight } from "./weights.ts";
 
@@ -62,6 +62,14 @@ export function updateProfile(next: Profile): StateResponse {
     enqueue("mesocycle", { reason: "Training setup changed" });
   }
   const foodInputs = (p: Profile) => [p.nutrition, p.schedule.wakeTime, p.schedule.sleepTime, p.training.workoutTime, p.training.days];
-  if (changed(foodInputs(prev), foodInputs(next))) enqueue("meal_menu", { weekStart: planWeekStart(next, date), reason: "Food preferences changed" });
+  if (changed(foodInputs(prev), foodInputs(next))) {
+    // This week's groceries are bought once its shopping day has come, so re-plan it from them; a
+    // prepared next week hasn't been shopped yet and is simply rewritten.
+    const current = planWeekStart(next, date);
+    const shopped = date >= shoppingDateFor(next, current) && menuRowForWeek(current) != null;
+    enqueue("meal_menu", { weekStart: current, keepGroceries: shopped, reason: "Food preferences changed" });
+    const upcoming = addDays(current, 7);
+    if (menuRowForWeek(upcoming)) enqueue("meal_menu", { weekStart: upcoming, reason: "Food preferences changed" });
+  }
   return state();
 }
