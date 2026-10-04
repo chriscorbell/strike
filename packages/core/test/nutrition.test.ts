@@ -51,31 +51,45 @@ describe("navy body fat", () => {
 
 describe("meal timing", () => {
   const targets = { kcal: 2400, proteinG: 180, carbsG: 250, fatG: 70 };
-  it("puts meals around an evening workout", () => {
+  const gaps = (times: string[]) => times.slice(1).map((t, i) => toMin(t) - toMin(times[i]!));
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+
+  it("puts a meal before and after an evening workout", () => {
     const meals = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 4, workout: { start: "17:30", minutes: 60 }, targets });
     expect(meals).toHaveLength(4);
-    expect(meals.map((m) => m.role)).toContain("pre_workout");
-    expect(meals.map((m) => m.role)).toContain("post_workout");
     const pre = meals.find((m) => m.role === "pre_workout")!;
     const post = meals.find((m) => m.role === "post_workout")!;
-    expect(pre.time).toBe("16:00");
-    expect(post.time).toBe("19:15");
+    expect(toMin("17:30") - toMin(pre.time)).toBeGreaterThanOrEqual(60);
+    expect(toMin("17:30") - toMin(pre.time)).toBeLessThanOrEqual(180);
+    expect(toMin(post.time) - toMin("18:30")).toBeLessThanOrEqual(75);
     expect(post.targets.carbsG).toBeGreaterThan(meals[0]!.targets.carbsG);
     const times = meals.map((m) => m.time);
     expect([...times].sort()).toEqual(times);
   });
-  it("handles an early workout", () => {
+
+  it("doesn't leave a long gap with three meals and an evening session", () => {
+    const meals = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 3, workout: { start: "19:00", minutes: 20 }, targets });
+    expect(meals.map((m) => m.label)).toEqual(["Breakfast", "Lunch", "Post-workout"]);
+    expect(Math.max(...gaps(meals.map((m) => m.time)))).toBeLessThanOrEqual(6.5 * 60);
+    expect(toMin(meals[0]!.time) - toMin("07:00")).toBeLessThanOrEqual(90);
+  });
+
+  it("trains fasted when the session is right after waking, then eats", () => {
     const meals = planMeals({ wakeTime: "06:00", sleepTime: "22:00", mealsPerDay: 4, workout: { start: "06:45", minutes: 60 }, targets });
     expect(meals).toHaveLength(4);
-    expect(meals[0]!.role).toBe("pre_workout");
-    expect(meals[1]!.role).toBe("post_workout");
+    expect(meals[0]!.role).toBe("post_workout");
+    expect(toMin(meals[0]!.time) - toMin("07:45")).toBeLessThanOrEqual(75);
   });
-  it("spreads rest-day meals", () => {
+
+  it("spreads rest-day meals from breakfast to evening", () => {
     const meals = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 5, workout: null, targets });
     expect(meals).toHaveLength(5);
     expect(meals[0]!.time).toBe("07:45");
-    expect(meals[4]!.time).toBe("21:30");
+    expect(toMin(meals[4]!.time)).toBeGreaterThanOrEqual(toMin("19:30"));
+    expect(Math.max(...gaps(meals.map((m) => m.time)))).toBeLessThanOrEqual(4 * 60);
+    expect(new Set(meals.map((m) => m.label)).size).toBe(5);
   });
+
   it("sums close to the daily targets", () => {
     const meals = planMeals({ wakeTime: "07:00", sleepTime: "23:00", mealsPerDay: 4, workout: { start: "12:00", minutes: 60 }, targets });
     const p = meals.reduce((a, m) => a + m.targets.proteinG, 0);
