@@ -19,6 +19,7 @@
 | **Check-in** | The weekly review on the prep evening: trend vs goal rate, the calorie adjustment for the coming week, training and meal adherence, and the coach's note. |
 | **Menu** | A plan week's meals: for each **slot** of a training day and a rest day, home-cooked and grab-and-go **options** sized to the slot's macro targets, and the **plan**. |
 | **Plan** | One option per meal per day, built from a few batch-cooked dishes. Swapping a planned meal changes the grocery list. |
+| **Prep guide** | The week's step-by-step meal prep, written from the plan: cooking **sessions** (usually the first day and midweek, since cooked food keeps about four days), each with equipment, ingredients, steps, timers and one labeled **container** per planned meal; plus reminders, reheating and food safety. Followed in **cook mode**. |
 | **Grocery list** | The plan's home-cooked ingredients, totaled per **catalog** item (how a store sells it) and rounded to packages; **staples** are listed to check, not buy. |
 | **Slot** | One meal in a day's plan, with a time, a role (regular, pre-workout, post-workout, bedtime) and macro targets. |
 | **Coach** | Claude, called through the Agent SDK on the Claude subscription. It writes blocks, menus, extra options, meal estimates and check-in notes as background **jobs**. |
