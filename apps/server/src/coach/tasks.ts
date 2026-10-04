@@ -20,7 +20,7 @@ import {
 } from "@strike/core";
 import { env } from "../env.ts";
 import { checkInById, setCheckInCoachNote } from "../services/checkins.ts";
-import { registerHandler } from "../services/jobs.ts";
+import { enqueue, registerHandler } from "../services/jobs.ts";
 import { dayTypeOn, menuRowFor, menuSlotsTemplate, plannedMeals, planWeekStart, saveMenu, toMenu, updateMenuData } from "../services/meals.ts";
 import type { MenuData } from "../db/index.ts";
 import { requireProfile, today } from "../services/profile.ts";
@@ -29,6 +29,7 @@ import { currentWeightKg } from "../services/weights.ts";
 import { askClaude, coachEnabled } from "./claude.ts";
 import { exerciseCatalog, mealHistoryContext, personContext, SYSTEM, trainingHistoryContext } from "./context.ts";
 import { fallbackCatalog, fallbackOptions } from "./fallback-meals.ts";
+import { prepGuideHandler } from "./prep-guide.ts";
 
 async function withFallback<T>(label: string, viaCoach: () => Promise<T>, fallback: () => T): Promise<{ value: T; source: "coach" | "fallback"; reason?: string }> {
   if (!coachEnabled()) return { value: fallback(), source: "fallback", reason: `Coach mode is ${env.coach}.` };
@@ -281,6 +282,8 @@ async function menuHandler(input: Record<string, unknown>) {
     () => fallbackMenu(profile, template, weekStart, dates),
   );
   const row = saveMenu(weekStart, result.source, result.value);
+  // The detailed prep guide is written from the finished plan, as its own job.
+  enqueue("prep_guide", { menuId: row.id });
   return { menuId: row.id, source: result.source, reason: result.reason ?? null };
 }
 
@@ -391,6 +394,7 @@ async function checkInNoteHandler(input: Record<string, unknown>) {
 export function registerCoachHandlers() {
   registerHandler("mesocycle", mesoHandler);
   registerHandler("meal_menu", menuHandler);
+  registerHandler("prep_guide", prepGuideHandler);
   registerHandler("more_options", moreOptionsHandler);
   registerHandler("estimate_meal", estimateHandler);
   registerHandler("check_in_note", checkInNoteHandler);

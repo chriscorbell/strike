@@ -86,7 +86,24 @@ export function dayView(date?: string): TodayResponse {
     pendingJobs: pendingJobs(),
     menuReady: menu != null,
     upcomingWeek: upcomingWeek(profile, now),
+    prep: prepFor(d),
   };
+}
+
+/** Cooking sessions and reminders from the prep guides that cover this date. */
+function prepFor(date: string): TodayResponse["prep"] {
+  const rows = [menuRowFor(date), menuRowFor(addDays(date, 7))].filter((r, i, a): r is NonNullable<typeof r> => r != null && a.findIndex((x) => x?.id === r.id) === i);
+  for (const row of rows) {
+    const guide = row.data.prepGuide;
+    if (!guide) continue;
+    const sessions = guide.sessions
+      .map((s, index) => ({ index, title: s.title, covers: s.covers, activeMinutes: s.activeMinutes, totalMinutes: s.totalMinutes, date: s.date }))
+      .filter((s) => s.date === date)
+      .map(({ date: _date, ...s }) => s);
+    const reminders = guide.reminders.filter((r) => r.date === date).map((r) => ({ time: r.time, text: r.text }));
+    if (sessions.length || reminders.length) return { menuId: row.id, sessions, reminders };
+  }
+  return null;
 }
 
 /** From the evening before shopping day until the week starts: whether next week's plan is ready. */

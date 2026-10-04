@@ -35,6 +35,16 @@ export function onJobDone(fn: (job: Job) => void) {
 const SINGLETON: JobKind[] = ["mesocycle", "meal_menu", "check_in_note"];
 
 export function enqueue(kind: JobKind, input: Record<string, unknown> = {}): Job {
+  if (kind === "prep_guide") {
+    // One pending guide per menu.
+    const pending = db
+      .select()
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.kind, kind), inArray(schema.jobs.status, ["queued", "running"])))
+      .all()
+      .find((j) => j.input.menuId === input.menuId);
+    if (pending) return toJob(pending);
+  }
   if (SINGLETON.includes(kind)) {
     const pending = db
       .select()

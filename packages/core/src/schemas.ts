@@ -235,6 +235,51 @@ export const GroceryCatalogItem = z.object({
 });
 export type GroceryCatalogItem = z.infer<typeof GroceryCatalogItem>;
 
+/** One cooking session: everything needed to prep a stretch of the week's planned meals. */
+export const PrepSession = z.object({
+  date: LocalDate,
+  title: z.string(),
+  /** Which meals it produces, e.g. "Sun–Wed lunches and dinners". */
+  covers: z.string(),
+  activeMinutes: z.number().int(),
+  totalMinutes: z.number().int(),
+  equipment: z.array(z.string()),
+  /** Everything to take out before starting, with session totals. */
+  ingredients: z.array(z.object({ item: z.string(), amount: z.string() })),
+  steps: z.array(
+    z.object({
+      text: z.string(),
+      /** A wait worth a timer (baking, simmering, resting); 0 when there's none. */
+      timerMinutes: z.number().int().min(0),
+      /** Optional detail: doneness checks, what to do meanwhile; empty when none. */
+      tip: z.string(),
+    }),
+  ),
+  /** One container per planned meal. */
+  containers: z.array(
+    z.object({
+      label: z.string(),
+      contents: z.string(),
+      storage: z.enum(["fridge", "freezer"]),
+      eatBy: LocalDate,
+    }),
+  ),
+});
+export type PrepSession = z.infer<typeof PrepSession>;
+
+/** The week's meal-prep guide, written from the finished plan. */
+export const PrepGuide = z.object({
+  overview: z.string(),
+  /** Things to do on a given day outside the cooking sessions: thawing, soaking, a quick top-up cook. */
+  reminders: z.array(z.object({ date: LocalDate, time: TimeOfDay.nullable(), text: z.string() })),
+  sessions: z.array(PrepSession),
+  reheating: z.array(z.object({ dish: z.string(), instructions: z.string() })),
+  foodSafety: z.array(z.string()),
+  createdAt: z.string(),
+  source: z.enum(["coach", "fallback"]),
+});
+export type PrepGuide = z.infer<typeof PrepGuide>;
+
 /** The planned dish for each meal of one day. */
 export const PlanDay = z.object({
   date: LocalDate,
@@ -254,6 +299,10 @@ export const MealMenu = z.object({
   /** Totaled from the plan's home-cooked meals. */
   groceryList: z.array(GroceryItem),
   prepTips: z.array(z.string()),
+  /** The detailed prep guide, once written; null while it's being written or for older menus. */
+  prepGuide: PrepGuide.nullable(),
+  /** The plan changed after the guide was written, so its amounts may be off. */
+  prepGuideStale: z.boolean(),
   coachNote: z.string(),
 });
 export type MealMenu = z.infer<typeof MealMenu>;
@@ -437,7 +486,7 @@ export type CheckIn = z.infer<typeof CheckIn>;
 
 // ---------- Jobs ----------
 
-export const JobKind = z.enum(["mesocycle", "meal_menu", "check_in_note", "more_options", "estimate_meal"]);
+export const JobKind = z.enum(["mesocycle", "meal_menu", "prep_guide", "check_in_note", "more_options", "estimate_meal"]);
 export type JobKind = z.infer<typeof JobKind>;
 
 export const Job = z.object({

@@ -139,6 +139,32 @@ describe("api", () => {
     expect((await call("GET", "/api/menu?week=someday")).status).toBe(400);
   });
 
+  it("writes a prep guide from the plan and notices when the plan changes", async () => {
+    await call("POST", "/api/menu/regenerate", { week: "current" });
+    await idle();
+    let menu = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    expect(menu.prepGuide).not.toBeNull();
+    expect(menu.prepGuideStale).toBe(false);
+    const guide = menu.prepGuide!;
+    expect(guide.sessions.length).toBeGreaterThan(0);
+    const planned = menu.plan.flatMap((d) => d.meals).filter((m) => menu.slots.flatMap((s) => s.options).find((o) => o.id === m.optionId)?.kind === "home");
+    expect(guide.sessions.reduce((a, s) => a + s.containers.length, 0)).toBe(planned.length);
+
+    const day = menu.plan[0]!;
+    const slot = menu.slots.find((s) => s.dayType === day.dayType && s.slotIndex === day.meals[0]!.slotIndex)!;
+    const other = slot.options.find((o) => o.id !== day.meals[0]!.optionId)!;
+    menu = (await call<MealMenu>("PUT", `/api/menu/${menu.id}/plan`, { date: day.date, slotIndex: day.meals[0]!.slotIndex, optionId: other.id })).body;
+    expect(menu.prepGuideStale).toBe(true);
+
+    expect((await call("POST", `/api/menu/${menu.id}/prep-guide`)).status).toBe(200);
+    await idle();
+    menu = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    expect(menu.prepGuideStale).toBe(false);
+
+    const today = (await call<TodayResponse>("GET", `/api/today?date=${guide.sessions[0]!.date}`)).body;
+    expect(today.prep?.sessions.length).toBeGreaterThan(0);
+  });
+
   it("keeps manual weigh-ins over Apple Health", async () => {
     await call("POST", "/api/weights", { date: "2026-01-02", weightKg: 84, source: "manual" });
     const batch = await call<{ imported: number }>("POST", "/api/weights/batch", { source: "healthkit", entries: [{ date: "2026-01-02", weightKg: 90 }, { date: "2026-01-03", weightKg: 84.2 }] });

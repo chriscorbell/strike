@@ -24,7 +24,7 @@ import { env } from "./env.ts";
 import { HttpError } from "./http.ts";
 import { addCoachNote, checkInDue, latestCheckIn, listCheckIns, runCheckIn } from "./services/checkins.ts";
 import { enqueue, getJob, pendingJobs, recentJobs } from "./services/jobs.ts";
-import { deleteMealLog, logMeal, mealHistory, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
+import { deleteMealLog, logMeal, mealHistory, menuRowById, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
 import { addMeasurements, onboard, state, updateProfile } from "./services/onboarding.ts";
 import { requireProfile, today } from "./services/profile.ts";
 import { dayView } from "./services/today.ts";
@@ -183,6 +183,11 @@ export function createApp() {
   app.post("/api/menu/regenerate", json(z.object({ note: z.string().max(2000).optional(), week: z.enum(["current", "next"]).optional() })), (c) => {
     const body = c.req.valid("json");
     return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, reason: "Requested" }));
+  });
+  app.post("/api/menu/:id/prep-guide", (c) => {
+    const menu = menuRowById(id(c));
+    if (!(menu.data.plan ?? []).length) throw new HttpError(409, "This menu has no day-by-day plan to prep from.");
+    return c.json(enqueue("prep_guide", { menuId: menu.id }));
   });
   app.put("/api/menu/:id/plan", json(z.object({ date: LocalDate, slotIndex: z.number().int().min(0), optionId: z.string() })), (c) => {
     const body = c.req.valid("json");

@@ -18,6 +18,7 @@ const EXPECTED: JobKind[] = ["mesocycle", "meal_menu"];
 const DONE_LABEL: Record<JobKind, string> = {
   mesocycle: "Training block ready",
   meal_menu: "This week's meals ready",
+  prep_guide: "Prep guide ready",
   check_in_note: "Check-in note ready",
   more_options: "More meal options ready",
   estimate_meal: "Meal estimated",

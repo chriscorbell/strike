@@ -182,9 +182,11 @@ extension JobKind {
         switch self {
         case .mesocycle: "Writing your training block"
         case .mealMenu: "Writing this week's menu"
+        case .prepGuide: "Writing your prep guide"
         case .checkInNote: "Reviewing your week"
         case .moreOptions: "Finding more meal options"
         case .estimateMeal: "Estimating your meal"
+        case .other: "Working"
         }
     }
 }

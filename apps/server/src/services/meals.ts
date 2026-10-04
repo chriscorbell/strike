@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import {
   addDays,
@@ -28,7 +29,7 @@ export { planWeekStart };
 
 /** The menu as clients see it, with the grocery list totaled from the current plan. */
 export function toMenu(row: MenuRow, profile: Profile = requireProfile()): MealMenu {
-  const { slots, plan = [], catalog, groceryList: legacy = [], prepTips, coachNote } = row.data;
+  const { slots, plan = [], catalog, groceryList: legacy = [], prepTips, coachNote, prepGuide: stored } = row.data;
   const normalized = slots.map((s) => ({
     ...s,
     options: s.options.map((o) => ({ ...o, ingredients: o.ingredients.map((i) => ({ ...i, groceryId: i.groceryId ?? null, quantity: i.quantity ?? null })) })),
@@ -36,7 +37,19 @@ export function toMenu(row: MenuRow, profile: Profile = requireProfile()): MealM
   const groceryList = catalog
     ? computeGroceries(catalog, normalized, plan, profile.units)
     : legacy.map((g) => ({ ...g, needed: null, staple: false }));
-  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, slots: normalized, plan, groceryList, prepTips, coachNote };
+  let prepGuide: MealMenu["prepGuide"] = null;
+  let prepGuideStale = false;
+  if (stored) {
+    const { planHash, ...guide } = stored;
+    prepGuide = guide;
+    prepGuideStale = planHash !== planFingerprint(plan);
+  }
+  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, slots: normalized, plan, groceryList, prepTips, coachNote, prepGuide, prepGuideStale };
+}
+
+/** Identifies a plan's meal assignments, so a prep guide can tell when the plan moved on. */
+export function planFingerprint(plan: MealMenu["plan"]): string {
+  return createHash("sha1").update(JSON.stringify(plan.map((d) => [d.date, d.meals.map((m) => [m.slotIndex, m.optionId])]))).digest("hex").slice(0, 16);
 }
 
 /** The menu written for exactly this plan week, if any. */
@@ -44,7 +57,7 @@ export function menuRowForWeek(weekStart: string): MenuRow | undefined {
   return db.select().from(schema.menus).where(eq(schema.menus.weekStart, weekStart)).orderBy(desc(schema.menus.id)).get();
 }
 
-function menuRowById(id: number): MenuRow {
+export function menuRowById(id: number): MenuRow {
   const row = db.select().from(schema.menus).where(eq(schema.menus.id, id)).get();
   if (!row) throw notFound("Menu");
   return row;

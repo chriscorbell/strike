@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { DayType, GroceryCatalogItem, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
+import type { DayType, GroceryCatalogItem, PrepGuide, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
 
 const now = () => new Date().toISOString();
 
@@ -14,6 +14,8 @@ export interface MenuData {
   groceryList?: { item: string; quantity: string; section: string; costUsd: number }[];
   prepTips: string[];
   coachNote: string;
+  /** The detailed prep guide, with a fingerprint of the plan it was written for. */
+  prepGuide?: PrepGuide & { planHash: string };
 }
 
 /** A single row: Strike has one user. */

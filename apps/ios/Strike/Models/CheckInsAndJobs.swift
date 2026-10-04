@@ -26,9 +26,17 @@ struct CheckInStatus: Codable, Hashable, Sendable {
 enum JobKind: String, Codable, Sendable {
     case mesocycle
     case mealMenu = "meal_menu"
+    case prepGuide = "prep_guide"
     case checkInNote = "check_in_note"
     case moreOptions = "more_options"
     case estimateMeal = "estimate_meal"
+    /// A kind this build doesn't know yet; decoding never fails on new server jobs.
+    case other
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = JobKind(rawValue: raw) ?? .other
+    }
 }
 
 enum JobStatus: String, Codable, Sendable {

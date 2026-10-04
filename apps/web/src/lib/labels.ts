@@ -115,6 +115,7 @@ export const WEEKDAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 export const JOB_LABEL: Record<JobKind, string> = {
   mesocycle: "Writing your training block",
   meal_menu: "Planning this week's meals",
+  prep_guide: "Writing your prep guide",
   check_in_note: "Writing your check-in note",
   more_options: "Finding more meal options",
   estimate_meal: "Estimating your meal",

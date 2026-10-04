@@ -77,6 +77,12 @@ export interface TodayResponse {
    * Next plan week, from the evening before shopping day until it starts: whether its meal plan and
    * grocery list are ready.
    */
+  /** Prep for this date: cooking sessions planned for it and reminders (thaw tonight, etc.). */
+  prep: {
+    menuId: number;
+    sessions: { index: number; title: string; covers: string; activeMinutes: number; totalMinutes: number }[];
+    reminders: { time: string | null; text: string }[];
+  } | null;
   upcomingWeek: {
     weekStart: string;
     shoppingDate: string;
