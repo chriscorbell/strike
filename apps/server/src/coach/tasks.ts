@@ -70,33 +70,38 @@ const MesoOut = z.object({
   ),
 });
 
+/** The prompt for a new training block: who Chris is, recent training, the current block, what's possible where, and the rules. */
+export function mesoPrompt(profile: Profile, previous: ReturnType<typeof activeMeso>, note: string | null): string {
+  const days = profile.training.days.length;
+  return [
+    personContext(profile),
+    trainingHistoryContext(),
+    previous ? `## Current block\n${JSON.stringify({ name: previous.plan.name, split: previous.plan.split, days: previous.plan.days.map((d) => ({ label: d.label, location: d.location, exercises: d.exercises.map((e) => `${e.exerciseId} ${e.sets}x${e.repMin}-${e.repMax}`) })) })}` : "## Current block\nNone. This is the first block.",
+    exerciseCatalog(profile),
+    "## Task",
+    `Write the next mesocycle. It needs exactly ${days} training days, in weekly order, one per lifting day. Label days by content (e.g. "Upper A"), never by weekday: a missed session slides to the next lifting day.`,
+    `- Pick each day's location (home or gym) and only use exercises available there. Prefer ${profile.training.defaultLocation} unless the other location clearly serves the day better.`,
+    `- Fit each session in about ${profile.training.sessionMinutes} minutes: roughly 2.5 minutes per working set including rest, so no more than ${Math.floor(profile.training.sessionMinutes / 2.5)} sets per day.`,
+    "- Week-one volume near minimum effective volume: about 2-3 sets per exercise, roughly 8-12 weekly sets for big muscles and 6-8 for smaller ones; the app adds sets from feedback as the block goes on. Give focus muscles a little more.",
+    "- Hit every major muscle at least twice a week when the day count allows. Order compound movements before isolation work.",
+    "- Starting loads: conservative estimates for this person's size, sex and experience; when recent training shows the exercise, use those numbers.",
+    previous ? "- Keep exercises that are progressing well; rotate stalled ones or ones with joint pain, about a third of the plan." : "",
+    note ? `- ${profile.name} asked: ${note}` : "",
+    `- Loads in ${loadUnit(profile.units)}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 async function mesoHandler(input: Record<string, unknown>) {
   const profile = requireProfile();
   const bw = currentWeightKg(today(profile)) ?? 80;
   const previous = activeMeso();
-  const days = profile.training.days.length;
   const note = typeof input.note === "string" && input.note ? input.note : null;
   const result = await withFallback(
     "mesocycle",
     async () => {
-      const prompt = [
-        personContext(profile),
-        trainingHistoryContext(),
-        previous ? `## Current block\n${JSON.stringify({ name: previous.plan.name, split: previous.plan.split, days: previous.plan.days.map((d) => ({ label: d.label, location: d.location, exercises: d.exercises.map((e) => `${e.exerciseId} ${e.sets}x${e.repMin}-${e.repMax}`) })) })}` : "## Current block\nNone. This is the first block.",
-        exerciseCatalog(profile),
-        "## Task",
-        `Write the next mesocycle. It needs exactly ${days} training days, in weekly order, one per lifting day. Label days by content (e.g. "Upper A"), never by weekday: a missed session slides to the next lifting day.`,
-        `- Pick each day's location (home or gym) and only use exercises available there. Prefer ${profile.training.defaultLocation} unless the other location clearly serves the day better.`,
-        `- Fit each session in about ${profile.training.sessionMinutes} minutes: roughly 2.5 minutes per working set including rest, so no more than ${Math.floor(profile.training.sessionMinutes / 2.5)} sets per day.`,
-        "- Week-one volume near minimum effective volume: about 2-3 sets per exercise, roughly 8-12 weekly sets for big muscles and 6-8 for smaller ones; the app adds sets from feedback as the block goes on. Give focus muscles a little more.",
-        "- Hit every major muscle at least twice a week when the day count allows. Order compound movements before isolation work.",
-        "- Starting loads: conservative estimates for this person's size, sex and experience; when recent training shows the exercise, use those numbers.",
-        previous ? "- Keep exercises that are progressing well; rotate stalled ones or ones with joint pain, about a third of the plan." : "",
-        note ? `- ${profile.name} asked: ${note}` : "",
-        `- Loads in ${loadUnit(profile.units)}.`,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const prompt = mesoPrompt(profile, previous, note);
       const out = await askClaude({ label: "mesocycle", system: SYSTEM, prompt, schema: MesoOut });
       return validateMeso(out as MesoPlan, profile, bw).plan;
     },
@@ -206,6 +211,39 @@ export function saveStarterMenu(profile: Profile, weekStart: string) {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** The prompt for a week's meal plan: who Chris is, what he ate, the meal slots and days, and the rules. */
+export function menuPrompt(profile: Profile, weekStart: string, dates: PlanDate[], template: Omit<MenuSlot, "options">[], note: string | null): string {
+  const now = today(profile);
+  const shopping = shoppingDateFor(profile, weekStart);
+  const slotText = template
+    .map((s) => `- ${s.dayType} day, slot ${s.slotIndex}: ${s.label} (${s.role.replace("_", "-")}) target ${Math.round(s.targets.kcal)} kcal, ${s.targets.proteinG} P / ${s.targets.carbsG} C / ${s.targets.fatG} F`)
+    .join("\n");
+  const dayText = dates.map((d) => `- ${DAY_NAMES[weekdayOf(d.date)]} ${d.date}: ${d.dayType} day`).join("\n");
+  return [
+    personContext(profile),
+    mealHistoryContext(),
+    "## Meal slots",
+    slotText,
+    "## Days to plan",
+    dayText,
+    "## Task",
+    `Write ${profile.name}'s meal plan for ${dates.length === 7 ? "the week" : "the rest of the week"} starting ${dates[0]!.date}. ${dates[0]!.date > now ? `They shop once, on ${shopping}, for the whole week.` : "They shop today for these days."}`,
+    "- slots: for every slot above, 2 home options and 2 grab-and-go options, each within about 10% of the slot's targets (protein matters most).",
+    "- Home options are the dishes the plan uses. Build the week from 3 to 5 distinct dishes that batch-cook well, reused across slots and days; when a dish serves two slots, it appears as an option in each with portions sized to that slot.",
+    "- plan: for every date listed, one home option (by its index in that day type's slot) for every slot of its day type. Repeat dishes across days. Cooked food keeps about four days, so plan two cooking sessions (the first day and midweek); one grocery trip must cover the week, so favor food that keeps: frozen vegetables and fruit, sturdy produce, eggs, dairy, canned goods.",
+    "- catalog: every ingredient the home options use, listed once, with how a typical US grocery store sells it and the price. Mark pantry staples.",
+    "- Every home-option ingredient names its catalog groceryId and quantity in that item's unit, as purchased.",
+    `- Keep the week's groceries, not counting staples, within about $${profile.nutrition.weeklyBudgetUsd}. Respect the cooking time and kitchen.`,
+    `- Grab-and-go options: specific orders at ${profile.nutrition.grabAndGo.join(", ") || "common chains"}, or any grocery or convenience store, with realistic nutrition and price. They're the backup for busy days and need no groceries.`,
+    "- Pre-workout meals light and carb-forward; post-workout meals carb- and protein-rich; bedtime meals protein-rich.",
+    "- Lean on what was actually eaten recently, and drop dishes that were skipped.",
+    "- prepTips: the batch-cooking schedule, what to cook on which day, at most four short tips. coachNote: one or two sentences.",
+    note ? `- ${profile.name} asked: ${note}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 async function menuHandler(input: Record<string, unknown>) {
   const profile = requireProfile();
   const now = today(profile);
@@ -215,37 +253,10 @@ async function menuHandler(input: Record<string, unknown>) {
   const template = menuSlotsTemplate(profile, dates[0]!.date);
   if (template.length === 0) throw new Error("No nutrition targets yet.");
   const note = typeof input.note === "string" && input.note ? input.note : null;
-  const shopping = shoppingDateFor(profile, weekStart);
   const result = await withFallback<MenuData>(
     "meal plan",
     async () => {
-      const slotText = template
-        .map((s) => `- ${s.dayType} day, slot ${s.slotIndex}: ${s.label} (${s.role.replace("_", "-")}) target ${Math.round(s.targets.kcal)} kcal, ${s.targets.proteinG} P / ${s.targets.carbsG} C / ${s.targets.fatG} F`)
-        .join("\n");
-      const dayText = dates.map((d) => `- ${DAY_NAMES[weekdayOf(d.date)]} ${d.date}: ${d.dayType} day`).join("\n");
-      const prompt = [
-        personContext(profile),
-        mealHistoryContext(),
-        "## Meal slots",
-        slotText,
-        "## Days to plan",
-        dayText,
-        "## Task",
-        `Write ${profile.name}'s meal plan for ${dates.length === 7 ? "the week" : "the rest of the week"} starting ${dates[0]!.date}. ${dates[0]!.date > now ? `They shop once, on ${shopping}, for the whole week.` : "They shop today for these days."}`,
-        "- slots: for every slot above, 2 home options and 2 grab-and-go options, each within about 10% of the slot's targets (protein matters most).",
-        "- Home options are the dishes the plan uses. Build the week from 3 to 5 distinct dishes that batch-cook well, reused across slots and days; when a dish serves two slots, it appears as an option in each with portions sized to that slot.",
-        "- plan: for every date listed, one home option (by its index in that day type's slot) for every slot of its day type. Repeat dishes across days. Cooked food keeps about four days, so plan two cooking sessions (the first day and midweek); one grocery trip must cover the week, so favor food that keeps: frozen vegetables and fruit, sturdy produce, eggs, dairy, canned goods.",
-        "- catalog: every ingredient the home options use, listed once, with how a typical US grocery store sells it and the price. Mark pantry staples.",
-        "- Every home-option ingredient names its catalog groceryId and quantity in that item's unit, as purchased.",
-        `- Keep the week's groceries, not counting staples, within about $${profile.nutrition.weeklyBudgetUsd}. Respect the cooking time and kitchen.`,
-        `- Grab-and-go options: specific orders at ${profile.nutrition.grabAndGo.join(", ") || "common chains"}, or any grocery or convenience store, with realistic nutrition and price. They're the backup for busy days and need no groceries.`,
-        "- Pre-workout meals light and carb-forward; post-workout meals carb- and protein-rich; bedtime meals protein-rich.",
-        "- Lean on what was actually eaten recently, and drop dishes that were skipped.",
-        "- prepTips: the batch-cooking schedule, what to cook on which day, at most four short tips. coachNote: one or two sentences.",
-        note ? `- ${profile.name} asked: ${note}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const prompt = menuPrompt(profile, weekStart, dates, template, note);
       const out = await askClaude({ label: "meal plan", system: SYSTEM, prompt, schema: MenuOut, timeoutMs: 45 * 60_000 });
       const stamp = Date.now().toString(36);
       const slots: MenuSlot[] = template.map((s) => {
