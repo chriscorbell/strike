@@ -55,7 +55,8 @@ struct DayTimeline: View {
 
     /// The first item still ahead of us (a meal within its hour, or a workout not yet over).
     private func nextItemID(at date: Date) -> String? {
-        guard data.date == Dates.today else { return data.date > Dates.today ? data.timeline.first?.id : nil }
+        // Quick actions belong to today only; other days are for looking ahead or filling in.
+        guard data.date == Dates.today else { return nil }
         let now = minutes(date)
         for item in data.timeline {
             switch item {
@@ -314,6 +315,10 @@ private struct WorkoutEntry: View {
     var onMove: () -> Void
 
     @Environment(AppModel.self) private var app
+    @Environment(TodayStore.self) private var store
+
+    /// A planned session seen on another day is a preview: starting it always starts it today.
+    private var isPreview: Bool { workout.status == .planned && !store.isShowingToday }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -339,7 +344,7 @@ private struct WorkoutEntry: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity, minHeight: 34)
                 }
-                .buttonStyle(WorkoutEntryButtonStyle(prominent: workout.status == .planned || workout.status == .inProgress))
+                .buttonStyle(WorkoutEntryButtonStyle(prominent: !isPreview && (workout.status == .planned || workout.status == .inProgress)))
 
                 if workout.status == .planned {
                     Button(action: onMove) {
@@ -362,18 +367,20 @@ private struct WorkoutEntry: View {
     }
 
     private var primaryTitle: String {
+        if isPreview { return "Preview" }
         switch workout.status {
-        case .planned: "Start"
-        case .inProgress: "Continue"
-        case .completed, .skipped: "View"
+        case .planned: return "Start"
+        case .inProgress: return "Continue"
+        case .completed, .skipped: return "View"
         }
     }
 
     private var primaryIcon: String {
+        if isPreview { return "eye" }
         switch workout.status {
-        case .planned: "play.fill"
-        case .inProgress: "arrow.right"
-        case .completed, .skipped: "list.bullet"
+        case .planned: return "play.fill"
+        case .inProgress: return "arrow.right"
+        case .completed, .skipped: return "list.bullet"
         }
     }
 

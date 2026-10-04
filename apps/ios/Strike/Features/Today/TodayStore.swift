@@ -16,11 +16,26 @@ final class TodayStore: AppStore {
     /// Slots waiting on a "more options" coach job.
     private(set) var optionJobSlots: Set<Int> = []
     private(set) var isChangingDay = false
+    /// The day on screen; nil follows today.
+    private(set) var selectedDate: LocalDate?
 
     @ObservationIgnored private var jobWatcher: Task<Void, Never>?
     @ObservationIgnored private var notificationTask: Task<Void, Never>?
 
-    var date: LocalDate { data?.date ?? app?.state?.today ?? Dates.today }
+    var date: LocalDate { selectedDate ?? data?.date ?? app?.state?.today ?? Dates.today }
+    var isShowingToday: Bool { selectedDate == nil }
+
+    /// Show another day; nil or today's date goes back to today.
+    func show(_ day: LocalDate?) async {
+        let target = day == Dates.today ? nil : day
+        guard target != selectedDate else { return }
+        selectedDate = target
+        await load()
+    }
+
+    func step(by days: Int) async {
+        await show(Dates.adding(days: days, to: date))
+    }
 
     // MARK: Loading
 
@@ -29,7 +44,7 @@ final class TodayStore: AppStore {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: TodayResponse = try await api.get("/api/today")
+            let response: TodayResponse = try await api.get("/api/today", query: selectedDate.map { ["date": $0] } ?? [:])
             apply(response)
             loadError = nil
         } catch is CancellationError {
@@ -45,7 +60,7 @@ final class TodayStore: AppStore {
     private func apply(_ response: TodayResponse) {
         withAnimation(Theme.spring) { data = response }
         watchJobs(response.pendingJobs)
-        scheduleNotifications(today: response)
+        if selectedDate == nil { scheduleNotifications(today: response) }
     }
 
     // MARK: Meals

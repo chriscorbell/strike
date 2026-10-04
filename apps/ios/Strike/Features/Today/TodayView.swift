@@ -14,6 +14,7 @@ struct TodayView: View {
     @State private var showLogOther = false
     @State private var showCheckIn = false
     @State private var confirmDayChange: DayType?
+    @State private var showDatePicker = false
 
     @AppStorage("askedNotificationPermission") private var askedNotifications = false
 
@@ -31,7 +32,7 @@ struct TodayView: View {
                 }
             }
             .background(Theme.screenBackground)
-            .navigationTitle("Today")
+            .navigationTitle(title)
             .navigationSubtitle(store.data.map { Dates.long($0.date) } ?? "")
             .toolbar { toolbar }
             .navigationDestination(for: TodayRoute.self) { route in
@@ -57,8 +58,14 @@ struct TodayView: View {
         .sheet(isPresented: $showCheckIn) {
             CheckInSheet()
         }
+        .sheet(isPresented: $showDatePicker) {
+            DayPickerSheet(selected: store.date) { day in
+                showDatePicker = false
+                Task { await store.show(day) }
+            }
+        }
         .confirmationDialog(
-            confirmDayChange == .rest ? "Make today a rest day?" : "Train today?",
+            confirmDayChange == .rest ? (store.isShowingToday ? "Make today a rest day?" : "Make this a rest day?") : (store.isShowingToday ? "Train today?" : "Make this a training day?"),
             isPresented: Binding(get: { confirmDayChange != nil }, set: { if !$0 { confirmDayChange = nil } }),
             titleVisibility: .visible,
             presenting: confirmDayChange
@@ -78,6 +85,11 @@ struct TodayView: View {
     private func content(_ data: TodayResponse) -> some View {
         ScrollView {
             VStack(spacing: 16) {
+                DaySwitcher(
+                    date: data.date,
+                    onStep: { days in Task { await store.step(by: days) } },
+                    onPick: { showDatePicker = true }
+                )
                 DayHeader(data: data)
 
                 if !data.pendingJobs.isEmpty {
@@ -200,8 +212,21 @@ struct TodayView: View {
 
     // MARK: Toolbar
 
+    private var title: String {
+        guard let date = store.data?.date, !store.isShowingToday else { return "Today" }
+        if date == Dates.adding(days: -1, to: Dates.today) { return "Yesterday" }
+        if date == Dates.adding(days: 1, to: Dates.today) { return "Tomorrow" }
+        return Dates.weekday(of: date).map { Dates.weekdays[$0] } ?? "Day"
+    }
+
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        if !store.isShowingToday {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Today") { Task { await store.show(nil) } }
+                    .accessibilityHint("Go back to today")
+            }
+        }
         if let data = store.data {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -209,9 +234,9 @@ struct TodayView: View {
                         Button("Move workout", systemImage: "clock.arrow.2.circlepath") { showWorkoutTime = true }
                     }
                     if data.dayType == .training {
-                        Button("Make today a rest day", systemImage: "bed.double") { confirmDayChange = .rest }
+                        Button(store.isShowingToday ? "Make today a rest day" : "Make this a rest day", systemImage: "bed.double") { confirmDayChange = .rest }
                     } else {
-                        Button("Train today", systemImage: "dumbbell") { confirmDayChange = .training }
+                        Button(store.isShowingToday ? "Train today" : "Make this a training day", systemImage: "dumbbell") { confirmDayChange = .training }
                     }
                     Divider()
                     Button("Log a meal", systemImage: "fork.knife") { showLogOther = true }
