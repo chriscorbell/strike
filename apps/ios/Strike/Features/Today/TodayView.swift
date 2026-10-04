@@ -307,12 +307,13 @@ struct MacroSummaryCard: View {
             ZStack {
                 ProgressRing(progress: targets.kcal > 0 ? consumed.kcal / targets.kcal : 0, color: Theme.kcal, lineWidth: 11)
                 VStack(spacing: 0) {
-                    Text(Fmt.integer(max(0, targets.kcal - consumed.kcal)))
+                    // Calories left, or how far past the target once over it.
+                    Text(Fmt.integer(abs(targets.kcal - consumed.kcal)))
                         .font(.number(.title2, weight: .bold))
                         .contentTransition(.numericText(value: consumed.kcal))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text(consumed.kcal > targets.kcal ? "over" : "kcal left")
+                    Text(consumed.kcal > targets.kcal ? "kcal over" : "kcal left")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
