@@ -167,10 +167,13 @@ function CookMode({ menu, week, index, session }: { menu: MealMenu; week: MenuWe
         </div>
       </motion.header>
 
-      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-10 lg:sticky lg:top-8 lg:self-start">
+      <div className="mt-10 flex flex-col gap-12">
+        {/* In cooking order: set out the equipment, then the ingredients, then the steps, then packing.
+            Nothing is pinned: a pinned column taller than the window hid most of the ingredients until
+            the end of the page. */}
+        <div className="flex flex-col gap-10">
           {session.equipment.length > 0 && (
-            <CookSection title="Equipment" done={checks.equipment.length} total={session.equipment.length}>
+            <CookSection title="Equipment" done={checks.equipment.length} total={session.equipment.length} columns>
               {session.equipment.map((item, i) => (
                 <li key={i}>
                   <CheckRow checked={has("equipment", i)} onToggle={(on) => toggle("equipment", i, on)}>
@@ -183,7 +186,7 @@ function CookMode({ menu, week, index, session }: { menu: MealMenu; week: MenuWe
             </CookSection>
           )}
           {session.ingredients.length > 0 && (
-            <CookSection title="Get out" done={checks.ingredients.length} total={session.ingredients.length}>
+            <CookSection title="Get out" done={checks.ingredients.length} total={session.ingredients.length} columns>
               {session.ingredients.map((ing, i) => (
                 <li key={i}>
                   <CheckRow checked={has("ingredients", i)} onToggle={(on) => toggle("ingredients", i, on)}>
@@ -199,7 +202,8 @@ function CookMode({ menu, week, index, session }: { menu: MealMenu; week: MenuWe
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-10">
+        {/* Steps read best at a comfortable line length. */}
+        <div className="flex min-w-0 max-w-3xl flex-col gap-10">
           <CookSection title="Steps" done={progress.done} total={progress.total}>
             {session.steps.map((step, i) => {
               const done = has("steps", i);
@@ -273,7 +277,7 @@ function CookMode({ menu, week, index, session }: { menu: MealMenu; week: MenuWe
   );
 }
 
-function CookSection({ title, done, total, children }: { title: string; done: number; total: number; children: ReactNode }) {
+function CookSection({ title, done, total, columns = false, children }: { title: string; done: number; total: number; columns?: boolean; children: ReactNode }) {
   return (
     <section aria-label={title}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -282,7 +286,8 @@ function CookSection({ title, done, total, children }: { title: string; done: nu
           {Math.min(done, total)} of {total}
         </span>
       </div>
-      <ul className="-mx-3 flex flex-col">{children}</ul>
+      {/* Short checklist rows flow into two columns on wide screens; each row stays whole. */}
+      <ul className={cn("-mx-3", columns ? "lg:columns-2 lg:gap-x-10 [&>li]:break-inside-avoid" : "flex flex-col")}>{children}</ul>
     </section>
   );
 }
