@@ -158,18 +158,20 @@ struct CookModeView: View {
                     } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 14) {
                             CheckMark(isChecked: isChecked)
-                            Text(item.0)
-                                .font(.title3)
-                                .strikethrough(isChecked, color: .secondary)
-                                .foregroundStyle(isChecked ? Color.secondary : Color.primary)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if let amount = item.1 {
-                                Text(amount)
-                                    .font(.body)
-                                    .foregroundStyle(Color.secondary)
-                                    .multilineTextAlignment(.trailing)
+                            // Amounts can be a whole sentence, so they sit under the name and wrap.
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.0)
+                                    .font(.title3)
+                                    .strikethrough(isChecked, color: .secondary)
+                                    .foregroundStyle(isChecked ? Color.secondary : Color.primary)
+                                if let amount = item.1 {
+                                    Text(amount)
+                                        .font(.body)
+                                        .foregroundStyle(Color.secondary)
+                                }
                             }
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.vertical, 14)
                         .contentShape(.rect)

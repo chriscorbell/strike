@@ -187,12 +187,11 @@ function CookMode({ menu, week, index, session }: { menu: MealMenu; week: MenuWe
               {session.ingredients.map((ing, i) => (
                 <li key={i}>
                   <CheckRow checked={has("ingredients", i)} onToggle={(on) => toggle("ingredients", i, on)}>
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className={cn("min-w-0 text-[16px] leading-snug", has("ingredients", i) ? "text-ink-3 line-through decoration-ink-3/50" : "text-ink")}>
-                        {ing.item}
-                      </span>
-                      <span className="tnum shrink-0 text-[15px] text-ink-3">{ing.amount}</span>
+                    {/* Amounts can be a whole sentence ("52 oz to cook today, 31 oz to freeze"), so they sit under the name and wrap. */}
+                    <span className={cn("block text-[16px] leading-snug", has("ingredients", i) ? "text-ink-3 line-through decoration-ink-3/50" : "text-ink")}>
+                      {ing.item}
                     </span>
+                    <span className="tnum mt-0.5 block text-[15px] leading-snug text-ink-3">{ing.amount}</span>
                   </CheckRow>
                 </li>
               ))}
