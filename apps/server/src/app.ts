@@ -23,7 +23,7 @@ import { coachEnabled } from "./coach/claude.ts";
 import { env } from "./env.ts";
 import { HttpError } from "./http.ts";
 import { addCoachNote, checkInDue, latestCheckIn, listCheckIns, runCheckIn } from "./services/checkins.ts";
-import { enqueue, getJob, pendingJobs, recentJobs } from "./services/jobs.ts";
+import { enqueue, getJob, pendingJobRows, pendingJobs, recentJobs, toJob } from "./services/jobs.ts";
 import { deleteMealLog, logMeal, mealHistory, menuRowById, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
 import { addMeasurements, onboard, state, updateProfile } from "./services/onboarding.ts";
 import { requireProfile, today } from "./services/profile.ts";
@@ -173,9 +173,12 @@ export function createApp() {
     const week = weekParam(c.req.query("week"));
     const row = c.req.query("week") === "next" ? menuRowForWeek(week) : menuRowFor(week);
     const profile = requireProfile();
+    // A plan job without a week was asked for the current one.
+    const current = planWeekStart(profile, today(profile));
+    const pending = pendingJobRows("meal_menu").find((j) => (typeof j.input.weekStart === "string" ? j.input.weekStart : current) === week);
     return c.json({
       menu: row ? toMenu(row) : null,
-      pendingJob: pendingJobs("meal_menu")[0] ?? null,
+      pendingJob: pending ? toJob(pending) : null,
       prepAt: prepMomentFor(profile, week),
       shoppingDate: shoppingDateFor(profile, week),
     });
@@ -184,6 +187,7 @@ export function createApp() {
     const body = c.req.valid("json");
     return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, reason: "Requested" }));
   });
+  app.get("/api/menus/:id", (c) => c.json(toMenu(menuRowById(id(c)))));
   app.post("/api/menu/:id/prep-guide", (c) => {
     const menu = menuRowById(id(c));
     if (!(menu.data.plan ?? []).length) throw new HttpError(409, "This menu has no day-by-day plan to prep from.");

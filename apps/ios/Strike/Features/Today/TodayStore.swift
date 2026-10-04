@@ -251,6 +251,8 @@ final class TodayStore: AppStore {
             let tomorrow: TodayResponse? = try? await api.get("/api/today", query: ["date": Dates.adding(days: 1, to: today.date)])
             guard !Task.isCancelled else { return }
             await self.app?.notifications.schedule(days: [today] + (tomorrow.map { [$0] } ?? []))
+            // Prep reminders come from the menus' guides; loading them reschedules.
+            await self.app?.meals.refreshIfStale()
         }
     }
 }

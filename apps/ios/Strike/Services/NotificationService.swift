@@ -116,6 +116,50 @@ final class NotificationService {
         }
     }
 
+    // MARK: Prep
+
+    private static let prepPrefix = "strike.prep."
+    private static let cookPrefix = "strike.cook."
+
+    /// Replaces Strike's prep reminders with these (their time, or 19:00 when they have none).
+    func schedulePrep(_ reminders: [PrepGuide.Reminder]) async {
+        let pending = await center.pendingNotificationRequests()
+        center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix(Self.prepPrefix) })
+        guard app?.notificationsEnabled == true else { return }
+        let status = await authorizationStatus()
+        guard status == .authorized || status == .provisional else { return }
+        let now = Date.now
+        for (index, reminder) in reminders.enumerated() {
+            guard let fireDate = Dates.date(at: reminder.time ?? "19:00", on: reminder.date), fireDate > now else { continue }
+            let content = UNMutableNotificationContent()
+            content.title = "Prep"
+            content.body = reminder.text
+            content.sound = .default
+            content.threadIdentifier = "prep"
+            let components = Dates.calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            try? await center.add(UNNotificationRequest(identifier: "\(Self.prepPrefix)\(reminder.date).\(index)", content: content, trigger: trigger))
+        }
+    }
+
+    /// A cook-mode timer ending, so it sounds with the phone locked.
+    func scheduleCookTimer(id: String, at date: Date, title: String, body: String) {
+        let interval = date.timeIntervalSinceNow
+        guard interval > 0.5 else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.threadIdentifier = "cook"
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        center.add(UNNotificationRequest(identifier: Self.cookPrefix + id, content: content, trigger: trigger))
+    }
+
+    func cancelCookTimer(id: String) {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.cookPrefix + id])
+        center.removeDeliveredNotifications(withIdentifiers: [Self.cookPrefix + id])
+    }
+
     // MARK: Rest timer
 
     func scheduleRestEnd(at date: Date, nextUp: String) {

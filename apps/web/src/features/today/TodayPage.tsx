@@ -19,6 +19,7 @@ import { CheckInCard } from "./CheckInCard.tsx";
 import { DaySheet } from "./DaySheet.tsx";
 import { MacroSummary } from "./MacroSummary.tsx";
 import { AddExtraMeal, Timeline } from "./Timeline.tsx";
+import { PrepTodayCard } from "./PrepTodayCard.tsx";
 import { UpcomingWeekCard } from "./UpcomingWeekCard.tsx";
 import { WeighInCard } from "./WeighInCard.tsx";
 
@@ -80,6 +81,7 @@ function TodayBody({ t, date, isToday }: { t: TodayResponse; date: string; isTod
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-12">
       <aside className="flex flex-col gap-3 lg:sticky lg:top-10 lg:order-2 lg:self-start">
+        {isToday && t.prep && <PrepTodayCard prep={t.prep} />}
         {isToday && t.upcomingWeek && <UpcomingWeekCard upcoming={t.upcomingWeek} />}
         <MacroSummary consumed={t.consumed} targets={t.targets} />
         {(isToday || t.weight.loggedKg != null) && <WeighInCard key={date} today={t} />}

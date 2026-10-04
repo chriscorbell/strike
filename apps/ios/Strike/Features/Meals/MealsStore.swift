@@ -24,6 +24,34 @@ struct MealsFocus: Equatable, Sendable {
     var section: MealsSection
 }
 
+/// One cooking session of one version of a menu's guide; a rewritten guide starts unchecked.
+struct CookKey: Hashable, Sendable {
+    var menuId: Int
+    var session: Int
+    /// The guide's `createdAt`.
+    var version: String
+}
+
+/// What's been checked off in cook mode, by index into each list.
+struct CookProgress: Codable, Hashable, Sendable {
+    var equipment: Set<Int> = []
+    var ingredients: Set<Int> = []
+    var steps: Set<Int> = []
+    var containers: Set<Int> = []
+
+    private static func defaultsKey(_ key: CookKey) -> String { "cook.\(key.menuId).\(key.session).\(key.version)" }
+
+    static func load(_ key: CookKey) -> CookProgress {
+        guard let data = UserDefaults.standard.data(forKey: defaultsKey(key)),
+              let progress = try? JSONDecoder().decode(CookProgress.self, from: data) else { return CookProgress() }
+        return progress
+    }
+
+    func save(_ key: CookKey) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(self), forKey: Self.defaultsKey(key))
+    }
+}
+
 /// A meal in a week's plan: which day and slot.
 struct PlanSlotRef: Hashable, Identifiable, Sendable {
     var week: MenuWeek
@@ -57,6 +85,16 @@ final class MealsStore: AppStore {
     /// Checked grocery item names, per menu id, persisted on the device.
     private(set) var checked: [Int: Set<String>] = [:]
 
+    /// Menus whose prep guide is being written at our request.
+    private(set) var writingGuides: Set<Int> = []
+    /// Menus fetched by id (`GET /api/menus/:id`) for cook mode, when they aren't this or next week's.
+    private(set) var otherMenus: [Int: MealMenu] = [:]
+    /// Cook-mode check-offs, keyed by `CookKey`, persisted on the device.
+    private(set) var cookProgress: [CookKey: CookProgress] = [:]
+
+    @ObservationIgnored private var lastLoaded: Date?
+    @ObservationIgnored private var guideWatcher: Task<Void, Never>?
+
     @ObservationIgnored private var watchers: [MenuWeek: Task<Void, Never>] = [:]
     @ObservationIgnored private var watchedJobs: [MenuWeek: Int] = [:]
     @ObservationIgnored private var handledTick = 0
@@ -89,6 +127,15 @@ final class MealsStore: AppStore {
         async let current: Void = load(.current)
         async let next: Void = load(.next)
         _ = await (current, next)
+        lastLoaded = .now
+        watchPendingGuides()
+        await schedulePrepReminders()
+    }
+
+    /// Loads both weeks if they're missing or older than a few minutes; used before scheduling reminders.
+    func refreshIfStale() async {
+        if let lastLoaded, Date.now.timeIntervalSince(lastLoaded) < 300, responses[.current] != nil { return }
+        await loadAll()
     }
 
     func load(_ week: MenuWeek) async {
@@ -217,6 +264,89 @@ final class MealsStore: AppStore {
         } catch {
             app?.report(error)
         }
+    }
+
+    // MARK: Prep guide
+
+    /// The menu with this id, from either week or fetched on its own.
+    func menu(id: Int) -> MealMenu? {
+        responses.values.lazy.compactMap(\.menu).first { $0.id == id } ?? otherMenus[id]
+    }
+
+    /// Makes sure a menu is available for cook mode, fetching it by id if it isn't one of the two weeks.
+    func ensureMenu(id: Int) async {
+        if menu(id: id) == nil { await loadAll() }
+        guard menu(id: id) == nil else { return }
+        do {
+            let menu: MealMenu = try await api.get("/api/menus/\(id)")
+            otherMenus[id] = menu
+        } catch {
+            app?.report(error)
+        }
+    }
+
+    func isWritingGuide(_ menu: MealMenu) -> Bool {
+        writingGuides.contains(menu.id) || menu.prepGuidePending
+    }
+
+    /// Writes or rewrites a menu's prep guide, waits for the job, then reloads.
+    func writePrepGuide(for menu: MealMenu) async {
+        guard !writingGuides.contains(menu.id) else { return }
+        withAnimation(Theme.spring) { _ = writingGuides.insert(menu.id) }
+        defer { withAnimation(Theme.spring) { _ = writingGuides.remove(menu.id) } }
+        do {
+            let job: Job = try await api.post("/api/menu/\(menu.id)/prep-guide")
+            let done = try await api.waitForJob(job.id)
+            if done.status == .failed {
+                app?.show(Toast(message: done.error ?? "The coach couldn't write the prep guide.", style: .error))
+            } else {
+                app?.show(Toast(message: "Prep guide ready", style: .success))
+            }
+            await loadAll()
+            await app?.today.load()
+        } catch {
+            app?.report(error)
+        }
+    }
+
+    /// While the server is writing a guide on its own (e.g. after a new plan), reloads until it's done.
+    private func watchPendingGuides() {
+        let pending = responses.values.compactMap(\.menu).contains(where: \.prepGuidePending)
+        guard pending, guideWatcher == nil else { return }
+        guideWatcher = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, !Task.isCancelled else { return }
+            self.guideWatcher = nil
+            await self.loadAll()
+            let stillPending = self.responses.values.compactMap(\.menu).contains(where: \.prepGuidePending)
+            if !stillPending { await self.app?.today.load() }
+        }
+    }
+
+    func cookProgress(_ key: CookKey) -> CookProgress {
+        cookProgress[key] ?? CookProgress.load(key)
+    }
+
+    func updateCookProgress(_ key: CookKey, _ change: (inout CookProgress) -> Void) {
+        var progress = cookProgress(key)
+        change(&progress)
+        cookProgress[key] = progress
+        progress.save(key)
+    }
+
+    /// Schedules the next week of guide reminders from both menus.
+    func schedulePrepReminders() async {
+        let today = app?.today.data?.date ?? Dates.today
+        let horizon = Dates.adding(days: 7, to: today)
+        var reminders: [PrepGuide.Reminder] = []
+        var seen = Set<String>()
+        for menu in responses.values.compactMap(\.menu) {
+            for reminder in menu.prepGuide?.reminders ?? [] where reminder.date >= today && reminder.date < horizon {
+                let id = "\(reminder.date)|\(reminder.time ?? "")|\(reminder.text)"
+                if seen.insert(id).inserted { reminders.append(reminder) }
+            }
+        }
+        await app?.notifications.schedulePrep(reminders)
     }
 
     // MARK: Groceries

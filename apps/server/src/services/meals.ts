@@ -19,6 +19,7 @@ import {
   type Profile,
 } from "@strike/core";
 import { db, schema, type MenuData } from "../db/index.ts";
+import { pendingJobRows } from "./jobs.ts";
 import { HttpError, notFound } from "../http.ts";
 import { requireProfile, targetsOn, today } from "./profile.ts";
 import { sessionOnDate } from "./training.ts";
@@ -44,7 +45,8 @@ export function toMenu(row: MenuRow, profile: Profile = requireProfile()): MealM
     prepGuide = guide;
     prepGuideStale = planHash !== planFingerprint(plan);
   }
-  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, slots: normalized, plan, groceryList, prepTips, coachNote, prepGuide, prepGuideStale };
+  const prepGuidePending = pendingJobRows("prep_guide").some((j) => j.input.menuId === row.id);
+  return { id: row.id, weekStart: row.weekStart, createdAt: row.createdAt, source: row.source, slots: normalized, plan, groceryList, prepTips, coachNote, prepGuide, prepGuideStale, prepGuidePending };
 }
 
 /** Identifies a plan's meal assignments, so a prep guide can tell when the plan moved on. */

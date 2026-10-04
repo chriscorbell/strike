@@ -57,7 +57,7 @@ export function prepGuidePrompt(profile: Profile, row: MenuRow, fromDate: string
     "- For each session: covers (which meals it produces), realistic active and total minutes, equipment (pans, sheet pans, air fryer, rice cooker, mixing bowls, containers with counts and sizes), and ingredients: everything to take out before starting, with exact totals for that session.",
     `- steps: in the order to actually do them, using every appliance in parallel and saying what to do while something cooks. Each step specific: quantities, cut sizes, pan and heat level, oven or air-fryer temperature in ${imperial ? "°F" : "°C"}, times, how to tell it's done (internal temperature for meat), cooling before packing. Put a waiting time in timerMinutes when a timer helps. Use tip for doneness checks and small tricks.`,
     "- The last steps of a session portion everything into containers. containers: one per planned meal it covers, labeled like 'Mon · Lunch', with contents and amounts exactly as planned (cooked weights where that's how they're portioned), fridge or freezer, and the date it's eaten (eatBy). Anything eaten more than four days after cooking goes in the freezer.",
-    "- reminders: anything to do on another day, with a date and time: moving frozen portions to the fridge the night before, thawing raw meat for the midweek cook, a quick fresh component. Null time if any time that day works.",
+    "- reminders: prep tasks on other days only, with a date and time: moving frozen portions or raw meat to the fridge to thaw, assembling something the night before, a quick fresh component. Not the meals themselves; the app already reminds them. Null time if any time that day works.",
     `- reheating: for each dish, how to reheat it well (microwave time and power, or skillet / air fryer), and what to add fresh after reheating. Use ${imperial ? "°F" : "°C"}.`,
     "- foodSafety: three or four short rules relevant to this week's food.",
     "- overview: two or three sentences: how the week's prep is organized and roughly how long it takes in total.",
@@ -87,6 +87,34 @@ const GuideOut = z.object({
   foodSafety: z.array(z.string()),
 });
 
+/** Session ingredient totals: each ingredient's recipe amounts added up when they share a unit. */
+function totals(meals: Occurrence[]): { item: string; amount: string }[] {
+  const byItem = new Map<string, { item: string; sums: Map<string, number>; other: string[] }>();
+  for (const { option } of meals) {
+    for (const ing of option.ingredients) {
+      const key = ing.item.toLowerCase();
+      const entry = byItem.get(key) ?? { item: ing.item, sums: new Map<string, number>(), other: [] };
+      const m = /^(\d+(?:\.\d+)?)\s*(.*)$/.exec(ing.amount.trim());
+      // "tbsp" and "tbsps" are the same unit; pluralized again on the way out.
+      const unit = m ? m[2]!.replace(/^(tbsp|scoop|slice)s$/, "$1") : "";
+      if (m) entry.sums.set(unit, (entry.sums.get(unit) ?? 0) + Number(m[1]));
+      else entry.other.push(ing.amount);
+      byItem.set(key, entry);
+    }
+  }
+  return [...byItem.values()].map((e) => ({
+    item: e.item.charAt(0).toUpperCase() + e.item.slice(1),
+    amount:
+      [
+        ...[...e.sums.entries()].map(([unit, n]) => {
+          const plural = /^(tbsp|scoop|slice)$/.test(unit) && n !== 1 ? `${unit}s` : unit;
+          return `${Math.round(n * 10) / 10}${plural ? ` ${plural}` : ""}`;
+        }),
+        ...e.other,
+      ].join(" + ") || "as needed",
+  }));
+}
+
 /** A plain guide built from the plan when the coach can't write one. */
 export function fallbackPrepGuide(row: MenuRow, fromDate: string): Omit<PrepGuide, "createdAt" | "source"> {
   const occ = occurrences(row.data, fromDate);
@@ -106,14 +134,18 @@ export function fallbackPrepGuide(row: MenuRow, fromDate: string): Omit<PrepGuid
       activeMinutes: 20 + 10 * byDish.size,
       totalMinutes: 30 + 15 * byDish.size,
       equipment: ["Sheet pan or air fryer", "Large skillet", "Pot or rice cooker", `${mine.length} meal-prep containers`],
-      ingredients: [...byDish.entries()].flatMap(([dish, list]) => list[0]!.option.ingredients.map((ing) => ({ item: `${ing.item} (${dish})`, amount: `${list.length} x ${ing.amount}` }))),
+      ingredients: totals(mine),
       steps: [
         { text: "Clear the counter, get out every ingredient and container, and preheat the oven or air fryer to 400°F.", timerMinutes: 0, tip: "" },
-        ...[...byDish.entries()].map(([dish, list]) => ({
-          text: `Make ${list.length} portion${list.length === 1 ? "" : "s"} of ${dish}: ${list[0]!.option.steps.join(" ")}`,
-          timerMinutes: 0,
-          tip: "Cook chicken to 165°F and ground meat to 160°F.",
-        })),
+        ...[...byDish.entries()].map(([dish, list]) => {
+          const text = list[0]!.option.ingredients.map((i) => i.item.toLowerCase()).join(" ");
+          const meat = /chicken|turkey|beef|pork|salmon|fish/.test(text);
+          return {
+            text: `Make ${list.length} portion${list.length === 1 ? "" : "s"} of ${dish}: ${list[0]!.option.steps.join(" ")}`,
+            timerMinutes: 0,
+            tip: meat ? "Cook poultry to 165°F, ground meat to 160°F and fish to 145°F." : "",
+          };
+        }),
         { text: "Let everything cool for 20–30 minutes, then portion into the labeled containers below and refrigerate within two hours of cooking.", timerMinutes: 25, tip: "" },
       ],
       containers: mine.map((o) => ({

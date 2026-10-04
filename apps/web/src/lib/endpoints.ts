@@ -95,9 +95,12 @@ export const endpoints = {
 
   // Meals
   menu: (week: MenuWeek = "current") => api<MenuResponse>(`/menu${q({ week })}`),
+  menuById: (id: number) => api<MealMenu>(`/menus/${id}`),
   regenerateMenu: (note?: string, week: MenuWeek = "current") =>
     api<Job>("/menu/regenerate", { method: "POST", body: { note, week } }),
   /** Put a different option on one meal of the plan; the grocery list follows. */
+  /** Write (or rewrite) the menu's prep guide. */
+  writePrepGuide: (menuId: number) => api<Job>(`/menu/${menuId}/prep-guide`, { method: "POST" }),
   setPlanMeal: (menuId: number, body: { date: string; slotIndex: number; optionId: string }) =>
     api<MealMenu>(`/menu/${menuId}/plan`, { method: "PUT", body }),
   logMeal: (body: MealLogRequest) => api<MealLog>("/meals/log", { method: "POST", body }),

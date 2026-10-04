@@ -42,6 +42,9 @@ struct MealsView: View {
             .navigationDestination(for: MealOption.self) { option in
                 MealOptionDetailView(option: option)
             }
+            .navigationDestination(for: CookRoute.self) { route in
+                CookModeView(route: route)
+            }
             .navigationDestination(isPresented: $isHistoryPresented) {
                 MealsHistoryView()
             }

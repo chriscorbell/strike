@@ -148,6 +148,8 @@ struct TodayResponse: Codable, Sendable {
     var menuReady: Bool
     /// Next plan week, from the evening before shopping day until it starts.
     var upcomingWeek: UpcomingWeek?
+    /// Prep for this date: cooking sessions planned for it and reminders.
+    var prep: TodayPrep?
 
     var meals: [TimelineMeal] {
         timeline.compactMap { if case let .meal(meal) = $0 { meal } else { nil } }
@@ -156,6 +158,26 @@ struct TodayResponse: Codable, Sendable {
     var workout: TimelineWorkout? {
         timeline.lazy.compactMap { if case let .workout(workout) = $0 { workout } else { nil } }.first
     }
+}
+
+struct TodayPrep: Codable, Hashable, Sendable {
+    struct Session: Codable, Hashable, Sendable {
+        /// Index into the menu's `prepGuide.sessions`.
+        var index: Int
+        var title: String
+        var covers: String
+        var activeMinutes: Int
+        var totalMinutes: Int
+    }
+
+    struct Reminder: Codable, Hashable, Sendable {
+        var time: TimeOfDay?
+        var text: String
+    }
+
+    var menuId: Int
+    var sessions: [Session]
+    var reminders: [Reminder]
 }
 
 struct UpcomingWeek: Codable, Hashable, Sendable {

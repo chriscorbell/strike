@@ -303,6 +303,8 @@ export const MealMenu = z.object({
   prepGuide: PrepGuide.nullable(),
   /** The plan changed after the guide was written, so its amounts may be off. */
   prepGuideStale: z.boolean(),
+  /** A prep guide for this menu is being written right now. */
+  prepGuidePending: z.boolean(),
   coachNote: z.string(),
 });
 export type MealMenu = z.infer<typeof MealMenu>;

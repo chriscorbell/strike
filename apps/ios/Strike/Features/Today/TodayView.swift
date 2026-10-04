@@ -2,6 +2,7 @@ import SwiftUI
 
 enum TodayRoute: Hashable {
     case meal(slotIndex: Int)
+    case cook(CookRoute)
 }
 
 /// The daily surface: what to eat and when, the workout, macros, weigh-in and check-in.
@@ -39,6 +40,8 @@ struct TodayView: View {
                 switch route {
                 case let .meal(slotIndex):
                     MealSlotView(slotIndex: slotIndex)
+                case let .cook(route):
+                    CookModeView(route: route)
                 }
             }
             .refreshable { await store.load() }
@@ -105,6 +108,12 @@ struct TodayView: View {
 
                 if data.checkIn.due {
                     checkInCard
+                }
+
+                if let prep = data.prep, !prep.sessions.isEmpty || !prep.reminders.isEmpty {
+                    PrepTodayCard(prep: prep, isToday: store.isShowingToday) { index in
+                        path.append(TodayRoute.cook(CookRoute(menuId: prep.menuId, session: index)))
+                    }
                 }
 
                 if let upcoming = data.upcomingWeek {
@@ -396,5 +405,69 @@ private struct UpcomingWeekCard: View {
         default:
             if let day = Dates.weekday(of: week.shoppingDate) { "Shop \(Dates.weekdays[day])" } else { "Shop \(Dates.short(week.shoppingDate))" }
         }
+    }
+}
+
+// MARK: - Prep
+
+/// The day's cooking sessions from the prep guide, opening cook mode, and its reminders.
+private struct PrepTodayCard: View {
+    var prep: TodayPrep
+    var isToday: Bool
+    var open: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(prep.sessions.enumerated()), id: \.element.index) { position, session in
+                if position > 0 { Divider().padding(.vertical, 12) }
+                Button {
+                    open(session.index)
+                } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "frying.pan.fill")
+                            .font(.title3)
+                            .foregroundStyle(.tint)
+                            .frame(width: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(isToday ? "Prep today" : "Prep"): \(session.title)")
+                                .font(.headline)
+                                .foregroundStyle(Color.primary)
+                            Text("\(session.activeMinutes) min hands-on · \(session.covers)")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens cook mode")
+            }
+            ForEach(Array(prep.reminders.enumerated()), id: \.offset) { position, reminder in
+                if position > 0 || !prep.sessions.isEmpty { Divider().padding(.vertical, 12) }
+                HStack(alignment: .firstTextBaseline, spacing: 14) {
+                    Image(systemName: "bell.fill")
+                        .font(.body)
+                        .foregroundStyle(Theme.carbs)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let time = reminder.time {
+                            Text(Dates.display(time))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Text(reminder.text)
+                            .font(.body)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .card()
     }
 }

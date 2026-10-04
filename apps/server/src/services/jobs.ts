@@ -75,6 +75,16 @@ export function pendingJobs(kind?: JobKind): Job[] {
     .map(toJob);
 }
 
+/** Pending jobs with their inputs, for matching a job to the thing it works on. */
+export function pendingJobRows(kind: JobKind) {
+  return db
+    .select()
+    .from(schema.jobs)
+    .where(and(eq(schema.jobs.kind, kind), inArray(schema.jobs.status, ["queued", "running"])))
+    .orderBy(asc(schema.jobs.id))
+    .all();
+}
+
 export function recentJobs(limit = 20): Job[] {
   return db.select().from(schema.jobs).orderBy(desc(schema.jobs.id)).limit(limit).all().map(toJob);
 }

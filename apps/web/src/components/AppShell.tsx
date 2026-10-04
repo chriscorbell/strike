@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pending = usePendingJobs();
   const { pathname } = useLocation();
   // Full-screen tasks hide the phone tab bar and own the bottom of the screen.
-  const focusMode = pathname.startsWith("/sessions/") || pathname === "/settings/profile";
+  const focusMode = pathname.startsWith("/sessions/") || pathname.startsWith("/meals/prep/") || pathname === "/settings/profile";
 
   return (
     <div className="min-h-[100dvh] lg:pl-60">

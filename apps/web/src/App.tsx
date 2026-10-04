@@ -6,6 +6,7 @@ import { AppShell, Wordmark } from "./components/AppShell.tsx";
 import { ErrorState, Skeleton } from "./components/ui/States.tsx";
 import { Toaster, toastError } from "./components/ui/Toast.tsx";
 import { ConnectScreen } from "./features/connect/ConnectScreen.tsx";
+import { CookModePage } from "./features/meals/CookMode.tsx";
 import { MealsPage } from "./features/meals/MealsPage.tsx";
 import { PlanPage } from "./features/plan/PlanPage.tsx";
 import { SettingsPage } from "./features/settings/SettingsPage.tsx";
@@ -113,6 +114,7 @@ function Root() {
           <Route path="/" element={<TodayPage />} />
           <Route path="/sessions/:id" element={<SessionPage />} />
           <Route path="/meals" element={<MealsPage />} />
+          <Route path="/meals/prep/:menuId/:session" element={<CookModePage />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/settings" element={<SettingsPage />} />

@@ -18,6 +18,7 @@ export const keys = {
   exerciseHistory: (id: string) => ["exerciseHistory", id] as const,
   menu: ["menu"] as const,
   menuWeek: (week: MenuWeek) => ["menu", week] as const,
+  menuById: (id: number) => ["menu", "id", id] as const,
   mealHistory: (days?: number) => (days ? (["mealHistory", days] as const) : (["mealHistory"] as const)),
   checkins: ["checkins"] as const,
   checkinStatus: ["checkins", "status"] as const,
@@ -73,7 +74,16 @@ export const useMenu = (week: MenuWeek = "current") =>
   useQuery({
     queryKey: keys.menuWeek(week),
     queryFn: () => endpoints.menu(week),
-    refetchInterval: (query) => (query.state.data?.pendingJob ? 3000 : false),
+    // Poll while a new plan or its prep guide is being written.
+    refetchInterval: (query) => (query.state.data?.pendingJob || query.state.data?.menu?.prepGuidePending ? 3000 : false),
+  });
+
+export const useMenuById = (id: number) =>
+  useQuery({
+    queryKey: keys.menuById(id),
+    queryFn: () => endpoints.menuById(id),
+    enabled: Number.isFinite(id),
+    refetchInterval: (query) => (query.state.data?.prepGuidePending ? 3000 : false),
   });
 export const useMealHistory = (days = 14) =>
   useQuery({ queryKey: keys.mealHistory(days), queryFn: () => endpoints.mealHistory(days) });
@@ -105,6 +115,10 @@ export function invalidateForJob(qc: QueryClient, kind: JobKind) {
     case "more_options":
       void qc.invalidateQueries({ queryKey: keys.today() });
       void qc.invalidateQueries({ queryKey: keys.menu });
+      break;
+    case "prep_guide":
+      void qc.invalidateQueries({ queryKey: keys.menu });
+      void qc.invalidateQueries({ queryKey: keys.today() });
       break;
     case "estimate_meal":
       break;

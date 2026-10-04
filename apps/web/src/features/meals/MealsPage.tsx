@@ -1,12 +1,12 @@
 import { addDays, weekdayOf, weekStartOn, type DayType, type MealMenu, type MealOption, type MenuSlot } from "@strike/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { BedDouble, CalendarClock, ChefHat, Dumbbell, Lightbulb, RefreshCw, Sparkles, Utensils } from "lucide-react";
+import { BedDouble, CalendarClock, ChefHat, Dumbbell, RefreshCw, Sparkles, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { WorkingGlyph } from "../../components/CoachStatus.tsx";
 import { MacroBars, MacroLine } from "../../components/Macros.tsx";
-import { Page, PageHeader, Section } from "../../components/Page.tsx";
+import { Page, PageHeader } from "../../components/Page.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Field, TextArea } from "../../components/ui/Field.tsx";
 import { Segmented } from "../../components/ui/Segmented.tsx";
@@ -23,6 +23,7 @@ import { planReadyDay } from "../../lib/week.ts";
 import { GroceriesView } from "./GroceriesView.tsx";
 import { OptionRow, OptionSheet } from "./MealOption.tsx";
 import { PlanView } from "./PlanView.tsx";
+import { PrepView } from "./PrepView.tsx";
 
 type Tab = "plan" | "groceries" | "prep" | "history";
 const TABS: readonly Tab[] = ["plan", "groceries", "prep", "history"];
@@ -130,7 +131,7 @@ export function MealsPage() {
           ) : tab === "groceries" ? (
             <GroceriesView menu={menu} />
           ) : tab === "prep" ? (
-            <PrepView menu={menu} />
+            <PrepView menu={menu} week={week} />
           ) : menu.plan.length > 0 ? (
             <PlanView menu={menu} week={week} />
           ) : (
@@ -182,38 +183,6 @@ function NoMenu({ week, writing, onWrite }: { week: MenuWeek; writing: boolean; 
         </Button>
       }
     />
-  );
-}
-
-/** Prep tips and the coach's note for the week. */
-function PrepView({ menu }: { menu: MealMenu }) {
-  return (
-    <div className="grid max-w-5xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-14">
-      <Section title="Prep">
-        {menu.prepTips.length === 0 ? (
-          <p className="text-sm text-ink-3">No prep tips this week.</p>
-        ) : (
-          <ul className="flex flex-col gap-4">
-            {menu.prepTips.map((tip, i) => (
-              <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-ink-2">
-                <Lightbulb size={17} className="mt-1 shrink-0 text-ink-3" aria-hidden />
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-      {(menu.coachNote || menu.source === "fallback") && (
-        <Section title="From your coach" className="lg:mt-0">
-          {menu.source === "fallback" && (
-            <Badge tone="outline" className="mb-2">
-              Template plan
-            </Badge>
-          )}
-          {menu.coachNote && <p className="max-w-[68ch] text-[15px] leading-relaxed text-ink-2">{menu.coachNote}</p>}
-        </Section>
-      )}
-    </div>
   );
 }
 

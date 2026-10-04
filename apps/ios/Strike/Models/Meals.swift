@@ -91,6 +91,76 @@ struct MealMenu: Codable, Hashable, Sendable {
     var groceryList: [GroceryItem]
     var prepTips: [String]
     var coachNote: String
+    /// The detailed prep guide, once written; nil while it's being written or for older menus.
+    var prepGuide: PrepGuide?
+    /// The plan changed after the guide was written, so its amounts may be off.
+    var prepGuideStale: Bool
+    /// A prep-guide job for this menu is queued or running.
+    var prepGuidePending: Bool
+}
+
+/// The week's meal-prep guide, written from the finished plan.
+struct PrepGuide: Codable, Hashable, Sendable {
+    /// Something to do on a given day outside the cooking sessions: thawing, soaking, a quick cook.
+    struct Reminder: Codable, Hashable, Sendable {
+        var date: LocalDate
+        var time: TimeOfDay?
+        var text: String
+    }
+
+    struct Reheating: Codable, Hashable, Sendable {
+        var dish: String
+        var instructions: String
+    }
+
+    var overview: String
+    var reminders: [Reminder]
+    var sessions: [PrepSession]
+    var reheating: [Reheating]
+    var foodSafety: [String]
+    var createdAt: Timestamp
+    var source: PlanSource
+}
+
+/// One cooking session: everything needed to prep a stretch of the week's planned meals.
+struct PrepSession: Codable, Hashable, Sendable {
+    struct Ingredient: Codable, Hashable, Sendable {
+        var item: String
+        var amount: String
+    }
+
+    struct Step: Codable, Hashable, Sendable {
+        var text: String
+        /// A wait worth a timer; 0 when there's none.
+        var timerMinutes: Int
+        /// Doneness checks or what to do meanwhile; empty when none.
+        var tip: String
+    }
+
+    enum Storage: String, Codable, Sendable {
+        case fridge
+        case freezer
+    }
+
+    /// One container per planned meal.
+    struct Container: Codable, Hashable, Sendable {
+        var label: String
+        var contents: String
+        var storage: Storage
+        var eatBy: LocalDate
+    }
+
+    var date: LocalDate
+    var title: String
+    /// Which meals it produces, e.g. "Sun–Wed lunches and dinners".
+    var covers: String
+    var activeMinutes: Int
+    var totalMinutes: Int
+    var equipment: [String]
+    /// Everything to take out before starting, with session totals.
+    var ingredients: [Ingredient]
+    var steps: [Step]
+    var containers: [Container]
 }
 
 enum MealLogStatus: String, Codable, Sendable {

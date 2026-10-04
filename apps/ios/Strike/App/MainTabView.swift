@@ -9,6 +9,7 @@ struct MainTabView: View {
 
     /// The screen stays on while a workout is open or in progress, even when minimized.
     private var keepAwake: Bool {
+        if app.isCooking { return true }
         guard let workout = app.activeWorkout else { return false }
         return !workout.isFinished && (app.isWorkoutPresented || workout.session?.status == .inProgress)
     }
@@ -30,6 +31,7 @@ struct MainTabView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .sensoryFeedback(.warning, trigger: app.cookTimers.finishedTick)
         .onChange(of: keepAwake, initial: true) { _, awake in
             UIApplication.shared.isIdleTimerDisabled = awake
         }

@@ -74,6 +74,9 @@ final class AppModel {
     let plan = PlanStore()
     let healthKit = HealthKitService()
     let notifications = NotificationService()
+    let cookTimers = CookTimers()
+    /// Cook mode is open; the screen stays awake.
+    var isCooking = false
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
@@ -95,6 +98,7 @@ final class AppModel {
             store.app = self
         }
         notifications.app = self
+        cookTimers.app = self
     }
 
     // MARK: Derived
