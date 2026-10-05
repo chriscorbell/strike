@@ -1,5 +1,5 @@
 import type { Muscle, MuscleFeedback, Session, SessionExercise } from "@strike/core";
-import { ArrowLeftRight, CircleCheck, Plus } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, CircleCheck, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Disclosure, Panel } from "../../components/Page.tsx";
 import { Button, IconButton } from "../../components/ui/Button.tsx";
@@ -56,6 +56,8 @@ export interface ExerciseCardProps {
   onDelete: (se: SessionExercise, index: number) => void;
   onAddSet: (se: SessionExercise) => void;
   onSwap: (se: SessionExercise) => void;
+  /** Open the form guide. */
+  onGuide: (se: SessionExercise) => void;
   onFeedback: (muscle: Muscle, change: FeedbackChange) => void;
 }
 
@@ -72,12 +74,16 @@ export function ExerciseCard({
   onDelete,
   onAddSet,
   onSwap,
+  onGuide,
   onFeedback,
 }: ExerciseCardProps) {
   const unit = session.loadUnit;
   const done = isExerciseDone(se);
   const anyLogged = se.sets.some((s) => s.log);
   const swappedFrom = substitutedName(se);
+  const nameBreak = se.name.lastIndexOf(" ") + 1;
+  const nameHead = se.name.slice(0, nameBreak);
+  const nameTail = se.name.slice(nameBreak);
   const stepLoad = loadStepFn(se.loadOptions, unit);
   const perHand = se.loadType === "dumbbell";
   const activeHere = active?.seId === se.id ? active : null;
@@ -92,7 +98,25 @@ export function ExerciseCard({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 text-[17px] font-semibold leading-snug tracking-tight text-ink">
-              <span className="min-w-0">{se.name}</span>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => onGuide(se)}
+                className="group -mx-1 -my-0.5 min-w-0 rounded-lg px-1 py-0.5 text-left transition-colors hover:text-accent"
+              >
+                {nameHead}
+                {/* The chevron stays with the last word instead of wrapping onto its own line. */}
+                <span className="whitespace-nowrap">
+                  {nameTail}
+                  <ChevronRight
+                    size={16}
+                    strokeWidth={2.25}
+                    className="ml-0.5 inline-block align-[-2px] text-ink-3 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-accent"
+                    aria-hidden
+                  />
+                </span>
+                <span className="sr-only">: how to do it</span>
+              </button>
               <AnimatePresence initial={false}>
                 {done && (
                   <motion.span

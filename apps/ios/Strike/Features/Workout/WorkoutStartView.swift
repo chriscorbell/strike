@@ -7,6 +7,7 @@ struct WorkoutStartView: View {
 
     @State private var location: Location
     @State private var soreness: [Muscle: Int] = [:]
+    @State private var guideTarget: SessionExercise?
 
     init(store: WorkoutStore, session: Session) {
         self.store = store
@@ -51,6 +52,9 @@ struct WorkoutStartView: View {
             .disabled(store.isWorking)
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
+        }
+        .sheet(item: $guideTarget) { exercise in
+            ExerciseGuideSheet(store: store, exercise: exercise)
         }
     }
 
@@ -139,21 +143,32 @@ struct WorkoutStartView: View {
                 .padding(.bottom, 10)
             VStack(spacing: 0) {
                 ForEach(Array(store.orderedExercises.enumerated()), id: \.element.id) { index, exercise in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(exercise.name)
-                                .font(.body.weight(.medium))
-                            Text(exercise.muscle.displayName)
-                                .font(.footnote)
+                    Button {
+                        guideTarget = exercise
+                    } label: {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(exercise.name)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                Text(exercise.muscle.displayName)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(previewTarget(exercise))
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
                         }
-                        Spacer()
-                        Text(previewTarget(exercise))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                        .padding(.vertical, 12)
+                        .contentShape(.rect)
                     }
-                    .padding(.vertical, 12)
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows how to do it, with a video")
                     if index < store.orderedExercises.count - 1 {
                         Divider()
                     }

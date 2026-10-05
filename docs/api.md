@@ -65,6 +65,7 @@ The server in `apps/server` serves this API under `/api` and the web app at `/`.
 | POST | `/api/sessions/:id/complete` | — | `CompleteSessionResponse` |
 | POST | `/api/sessions/:id/skip` | — | `Session` |
 | GET | `/api/exercises?logged=1` | — | `ExerciseInfo[]`; with `logged=1`, only exercises that have logged sets |
+| GET | `/api/exercises/:id` | — | `ExerciseDetail`: `ExerciseInfo` plus `guide`, how to do it: `setup`, `steps` and `mistakes` (lists of sentences) and a YouTube `video` (`youtubeId`, `title`, `channel`, `seconds`, and `start`, the offset where this exercise's technique begins) |
 | GET | `/api/exercises/:id/history` | — | `ExerciseHistoryResponse` |
 
 Set targets in a `Session`: each `SessionSet` has `targetWeight` (null for bodyweight work), `targetReps`, `targetRir`, the `log` once done, and `extra` for sets added during the session. Bodyweight sets may log a `weight` as added load. Log what was actually done: `weight`, `reps`, and `rir` (reps left in reserve; `0` = to failure; null means "about the target"). The progression engine uses those numbers to decide the next session's weight and reps; `SessionExercise.prescriptionNote` explains today's choice in one sentence. `SessionExercise.loadOptions` lists every load available for the exercise at the session's location (step weight controls through it), and `restSeconds` is the suggested rest between sets.

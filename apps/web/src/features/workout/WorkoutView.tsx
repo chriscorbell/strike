@@ -16,6 +16,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery.ts";
 import { useProfile } from "../../lib/queries.ts";
 import { OverflowMenu } from "./controls.tsx";
 import { ExerciseCard } from "./ExerciseCard.tsx";
+import { ExerciseGuideSheet, type GuideTarget } from "./ExerciseGuideSheet.tsx";
 import {
   feedbackFor,
   firstUnlogged,
@@ -71,6 +72,8 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
   const scrollTimer = useRef<number | undefined>(undefined);
   const [swapId, setSwapId] = useState<number | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [guide, setGuide] = useState<GuideTarget | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [confirm, setConfirm] = useState<"finish" | "skip" | null>(null);
 
   // Move focus (and the viewport, gently) to where the next action is.
@@ -170,6 +173,11 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
   const onSwap = (se: SessionExercise) => {
     setSwapId(se.id);
     setSwapOpen(true);
+  };
+
+  const onGuide = (se: SessionExercise) => {
+    setGuide({ exerciseId: se.exerciseId, name: se.name });
+    setGuideOpen(true);
   };
 
   const finish = () => {
@@ -274,6 +282,7 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
                   onDelete={onDelete}
                   onAddSet={onAddSet}
                   onSwap={onSwap}
+                  onGuide={onGuide}
                   onFeedback={actions.sendFeedback}
                 />
               );
@@ -343,6 +352,8 @@ export function WorkoutView({ session, actions }: WorkoutViewProps) {
       </div>
 
       {!desktop && <RestDock timer={timer} onDone={onRestDone} />}
+
+      <ExerciseGuideSheet target={guide} open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       <SwapSheet
         session={session}

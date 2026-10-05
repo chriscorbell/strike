@@ -4,7 +4,7 @@ A self-hosted training and nutrition coach for one person, with a web app and a 
 
 After onboarding, Strike tells you each day:
 
-- which workout to do and when, with the weight and reps for every set
+- which workout to do and when, with the weight and reps for every set, and how to do each exercise (tap it for a form guide and a technique video)
 - what to eat and when, with home-cooked and grab-and-go options for each meal
 
 You log the reps you actually did, and Strike decides whether next time's weight goes up, down or stays the same. Daily weigh-ins feed a smoothed weight trend. A weekly check-in adjusts calories to keep you on pace for your goal. Claude, running on your Claude subscription, writes the training blocks, the weekly menus and the check-in notes.
@@ -13,7 +13,7 @@ You log the reps you actually did, and Strike decides whether next time's weight
 
 | Part | Where | What it does |
 | --- | --- | --- |
-| Core engines | `packages/core` | Rule-based logic shared by every part: schemas, the exercise library, the progression engine, calorie targets and weekly adjustments, weight trend, meal timing, set-volume feedback, and the fallback block planner |
+| Core engines | `packages/core` | Rule-based logic shared by every part: schemas, the exercise library and its form guides, the progression engine, calorie targets and weekly adjustments, weight trend, meal timing, set-volume feedback, and the fallback block planner |
 | Server | `apps/server` | Hono API, SQLite through Drizzle, a background job queue for Claude work, a scheduler, daily backups. It also serves the web app |
 | Web app | `apps/web` | Vite + React |
 | iPhone app | `apps/ios` | SwiftUI, with Apple Health sync and meal and workout notifications |

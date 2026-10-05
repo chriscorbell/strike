@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CompleteSessionResponse, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
+import type { CompleteSessionResponse, ExerciseDetail, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
 import { createApp } from "../src/app.ts";
 import { registerCoachHandlers } from "../src/coach/tasks.ts";
 import { closeDb, runMigrations } from "../src/db/index.ts";
@@ -98,6 +98,17 @@ describe("api", () => {
     expect(done.body.summary.setCount).toBe(first.sets.length);
     const history = await call<{ points: unknown[] }>("GET", `/api/exercises/${first.exerciseId}/history`);
     expect(history.body.points).toHaveLength(1);
+  });
+
+  it("serves each exercise's form guide", async () => {
+    const today = (await call<TodayResponse>("GET", "/api/today")).body;
+    const s = (await call<Session>("GET", `/api/sessions/${today.nextSession!.id}`)).body;
+    const detail = await call<ExerciseDetail>("GET", `/api/exercises/${s.exercises[0]!.exerciseId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.name).toBe(s.exercises[0]!.name);
+    expect(detail.body.guide.steps.length).toBeGreaterThan(0);
+    expect(detail.body.guide.video.youtubeId).toMatch(/^[\w-]{11}$/);
+    expect((await call("GET", "/api/exercises/made_up")).status).toBe(404);
   });
 
   it("logs meals against the plan", async () => {

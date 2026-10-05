@@ -349,6 +349,12 @@ final class WorkoutStore {
         return "\(exercise.name) · set \(focused.index + 1): \(load)"
     }
 
+    // MARK: Form guide
+
+    func exerciseDetail(_ exerciseId: String) async throws -> ExerciseDetail {
+        try await api.get("/api/exercises/\(exerciseId)")
+    }
+
     // MARK: Swap
 
     func alternatives(for exercise: SessionExercise) async throws -> [ExerciseInfo] {
