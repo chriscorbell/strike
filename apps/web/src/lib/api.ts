@@ -50,9 +50,16 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-export async function api<T>(path: string, { method = "GET", body, signal }: RequestOptions = {}): Promise<T> {
+/**
+ * Send a request to the API with the bearer token. Resolves with the raw response when it's OK; throws an
+ * ApiError otherwise (and tells listeners on 401). For responses that aren't JSON, like event streams.
+ */
+export async function apiFetch(
+  path: string,
+  { method = "GET", body, signal, accept = "application/json" }: RequestOptions & { accept?: string } = {},
+): Promise<Response> {
   const token = getToken();
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: accept };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -73,22 +80,26 @@ export async function api<T>(path: string, { method = "GET", body, signal }: Req
     for (const l of unauthorizedListeners) l();
     throw new ApiError(401, "Unauthorized");
   }
-
-  const text = await res.text();
-  let data: unknown = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-  }
-
   if (!res.ok) {
-    const err = data as { error?: string; details?: unknown } | null;
+    const err = (await readJson(res)) as { error?: string; details?: unknown } | null;
     throw new ApiError(res.status, err?.error ?? `Request failed (${res.status})`, err?.details);
   }
-  return data as T;
+  return res;
+}
+
+async function readJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await apiFetch(path, options);
+  return (await readJson(res)) as T;
 }
 
 /** Human message for any thrown value. */

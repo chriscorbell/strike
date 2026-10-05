@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppTab: Hashable {
-    case today, meals, progress, plan
+    case today, meals, coach, progress, plan
 }
 
 struct MainTabView: View {
@@ -22,6 +22,9 @@ struct MainTabView: View {
             }
             Tab("Meals", systemImage: "fork.knife", value: AppTab.meals) {
                 MealsView()
+            }
+            Tab("Coach", systemImage: "bubble.left.and.text.bubble.right.fill", value: AppTab.coach) {
+                CoachView()
             }
             Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: AppTab.progress) {
                 BodyProgressView()

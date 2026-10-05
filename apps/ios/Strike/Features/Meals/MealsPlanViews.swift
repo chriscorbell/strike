@@ -356,6 +356,7 @@ struct MealsPrepSections: View {
 
     @Environment(MealsStore.self) private var meals
     @Environment(AppModel.self) private var app
+    @State private var isRedoPresented = false
 
     var body: some View {
         if let guide = menu.prepGuide {
@@ -376,16 +377,28 @@ struct MealsPrepSections: View {
                     .padding(.vertical, 4)
                 }
             }
-            if !guide.sessions.isEmpty {
-                Section("Cook") {
-                    ForEach(Array(guide.sessions.enumerated()), id: \.offset) { index, session in
-                        NavigationLink(value: CookRoute(menuId: menu.id, session: index)) {
-                            PrepSessionRow(
-                                session: session,
-                                progress: meals.cookProgress(CookKey(menuId: menu.id, session: index, version: guide.createdAt))
-                            )
-                        }
+            Section {
+                ForEach(Array(guide.sessions.enumerated()), id: \.offset) { index, session in
+                    NavigationLink(value: CookRoute(menuId: menu.id, session: index)) {
+                        PrepSessionRow(
+                            session: session,
+                            progress: meals.cookProgress(CookKey(menuId: menu.id, session: index, version: guide.createdAt))
+                        )
                     }
+                }
+                redoRow
+            } header: {
+                if !guide.sessions.isEmpty { Text("Cook") }
+            }
+            .sheet(isPresented: $isRedoPresented) {
+                PlanNoteSheet(
+                    title: "Redo from today",
+                    prompt: "Missed Sunday's cook; the chicken is frozen",
+                    footer: "Optional. The coach rewrites the guide from today on, in about 8 minutes.",
+                    submitLabel: "Rewrite"
+                ) { note in
+                    Task { await meals.writePrepGuide(for: menu, note: note) }
+                    return true
                 }
             }
             let today = app.today.data?.date ?? Dates.today
@@ -459,6 +472,29 @@ struct MealsPrepSections: View {
             Section(menu.source == .fallback ? "About this menu" : "Coach note") {
                 Text(menu.coachNote)
                     .font(.subheadline)
+            }
+        }
+    }
+
+    /// Rewrites the guide from today on with a note for the coach, e.g. after a missed cook day. While
+    /// the stale banner is up, its button shows the progress instead.
+    @ViewBuilder
+    private var redoRow: some View {
+        if meals.isWritingGuide(menu) {
+            if !menu.prepGuideStale {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Writing your prep guide…")
+                        .font(.subheadline.weight(.medium))
+                }
+                .frame(minHeight: 34)
+            }
+        } else {
+            Button {
+                isRedoPresented = true
+            } label: {
+                Label("Redo from today", systemImage: "arrow.counterclockwise")
+                    .font(.subheadline.weight(.semibold))
             }
         }
     }

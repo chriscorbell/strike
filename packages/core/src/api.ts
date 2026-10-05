@@ -3,6 +3,8 @@
 import type { ExerciseGuide } from "./exercise-guides.ts";
 import type {
   CheckIn,
+  CoachAction,
+  CoachMessage,
   DayType,
   Job,
   Location,
@@ -195,3 +197,32 @@ export interface MealHistoryDay {
   consumed: Macros;
   logs: MealLog[];
 }
+
+export interface CoachThreadSummary {
+  id: number;
+  /** The start of the first message. */
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoachThread extends CoachThreadSummary {
+  /** The coach is writing a reply right now. */
+  replying: boolean;
+  /** Oldest first. */
+  messages: CoachMessage[];
+}
+
+/**
+ * Server-sent events from `POST /api/coach/messages`: the SSE event name is `type`, and `data` is this
+ * object as JSON. A stream always ends with `done`.
+ */
+export type CoachStreamEvent =
+  | { type: "start"; thread: CoachThreadSummary; message: CoachMessage; reply: CoachMessage }
+  /** What the coach is doing while there's no text yet or between steps, e.g. "Reading the prep guide". */
+  | { type: "status"; text: string }
+  | { type: "delta"; text: string }
+  /** A change proposed mid-reply; it also arrives in `done`. */
+  | { type: "action"; action: CoachAction }
+  /** The finished reply (`status` done or failed). */
+  | { type: "done"; reply: CoachMessage };

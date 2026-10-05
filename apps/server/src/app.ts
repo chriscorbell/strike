@@ -3,10 +3,12 @@ import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z, ZodError, type ZodType } from "zod";
 import {
   addDays,
+  CoachMessageRequest,
   LocalDate,
   prepMomentFor,
   shoppingDateFor,
@@ -19,10 +21,13 @@ import {
   Profile,
   TimeOfDay,
 } from "@strike/core";
+import { applyActions, dismissActions } from "./coach/actions.ts";
+import { activeReply, followReply, isReplying, sendMessage } from "./coach/chat.ts";
 import { coachEnabled } from "./coach/claude.ts";
 import { env } from "./env.ts";
 import { HttpError } from "./http.ts";
 import { addCoachNote, checkInDue, latestCheckIn, listCheckIns, runCheckIn } from "./services/checkins.ts";
+import { deleteThread, listThreads, threadView } from "./services/coach-chat.ts";
 import { enqueue, getJob, pendingJobRows, pendingJobs, recentJobs, toJob } from "./services/jobs.ts";
 import { deleteMealLog, logMeal, mealHistory, menuRowById, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
 import { addMeasurements, onboard, state, updateProfile } from "./services/onboarding.ts";
@@ -189,10 +194,12 @@ export function createApp() {
     return c.json(enqueue("meal_menu", { weekStart: weekParam(body.week), note: body.note ?? null, keepGroceries: body.keepGroceries ?? false, reason: "Requested" }));
   });
   app.get("/api/menus/:id", (c) => c.json(toMenu(menuRowById(id(c)))));
-  app.post("/api/menu/:id/prep-guide", (c) => {
+  app.post("/api/menu/:id/prep-guide", async (c) => {
     const menu = menuRowById(id(c));
     if (!(menu.data.plan ?? []).length) throw new HttpError(409, "This menu has no day-by-day plan to prep from.");
-    return c.json(enqueue("prep_guide", { menuId: menu.id }));
+    // The body is optional: older clients post nothing.
+    const body = z.object({ note: z.string().max(2000).optional() }).parse(await c.req.json().catch(() => ({})));
+    return c.json(enqueue("prep_guide", { menuId: menu.id, note: body.note?.trim() || null }));
   });
   app.put("/api/menu/:id/plan", json(z.object({ date: LocalDate, slotIndex: z.number().int().min(0), optionId: z.string() })), (c) => {
     const body = c.req.valid("json");
@@ -218,6 +225,34 @@ export function createApp() {
     addCoachNote(c.req.valid("json").note);
     return c.json({ ok: true });
   });
+  // Ask Coach
+  app.get("/api/coach/threads", (c) => c.json(listThreads()));
+  app.get("/api/coach/threads/:id", (c) => {
+    const threadId = id(c);
+    return c.json(threadView(threadId, isReplying(threadId)));
+  });
+  app.delete("/api/coach/threads/:id", (c) => {
+    const threadId = id(c);
+    if (isReplying(threadId)) throw new HttpError(409, "The coach is still answering in this conversation.");
+    deleteThread(threadId);
+    return c.json({ ok: true });
+  });
+  app.post("/api/coach/messages", json(CoachMessageRequest), (c) => {
+    const { reply, start } = sendMessage(c.req.valid("json"));
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({ event: start.type, data: JSON.stringify(start) });
+      await followReply(reply, stream);
+    });
+  });
+  // Picks a reply back up, from its beginning, after the app lost the original stream.
+  app.get("/api/coach/threads/:id/stream", (c) => {
+    const reply = activeReply(id(c));
+    if (!reply) throw new HttpError(409, "The coach isn't writing a reply in this conversation.");
+    return streamSSE(c, (stream) => followReply(reply, stream));
+  });
+  app.post("/api/coach/messages/:id/apply", (c) => c.json(applyActions(id(c))));
+  app.post("/api/coach/messages/:id/dismiss", (c) => c.json(dismissActions(id(c))));
+
   app.get("/api/jobs", (c) => c.json(c.req.query("pending") ? pendingJobs() : recentJobs()));
   app.get("/api/jobs/:id", (c) => c.json(getJob(id(c))));
 

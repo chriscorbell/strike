@@ -2,6 +2,8 @@ import path from "node:path";
 
 const here = import.meta.dirname;
 
+type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+
 export const env = {
   port: Number(process.env.PORT ?? 3090),
   host: process.env.HOST ?? "0.0.0.0",
@@ -12,7 +14,9 @@ export const env = {
   coach: (process.env.STRIKE_COACH ?? "claude") as "claude" | "mock" | "off",
   model: process.env.STRIKE_MODEL ?? "claude-opus-5-5",
   /** Reasoning effort for every coach request. */
-  effort: (process.env.STRIKE_EFFORT ?? "xhigh") as "low" | "medium" | "high" | "xhigh" | "max",
+  effort: (process.env.STRIKE_EFFORT ?? "xhigh") as Effort,
+  /** Reasoning effort for Ask Coach replies, lower so a conversation moves at chat speed. */
+  chatEffort: (process.env.STRIKE_CHAT_EFFORT ?? "medium") as Effort,
   webDist: process.env.STRIKE_WEB_DIST ?? path.resolve(here, "../../web/dist"),
   migrations: path.resolve(here, "../drizzle"),
   /** A second place for daily backups, such as a NAS share. */

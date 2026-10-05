@@ -1,6 +1,21 @@
 // Friendly names for enum values in the API contract.
-import type { EquipmentItem, JobKind, Location, MealRole, Muscle, Profile, SessionStatus } from "@strike/core";
-import { Building, House, type LucideIcon } from "lucide-react";
+import type { CoachActionKind, EquipmentItem, JobKind, Location, MealRole, Muscle, Profile, SessionStatus } from "@strike/core";
+import {
+  ArrowLeftRight,
+  Building,
+  CalendarCog,
+  CalendarSync,
+  ChefHat,
+  ClipboardCheck,
+  Clock,
+  Dumbbell,
+  House,
+  MapPin,
+  NotebookPen,
+  Replace,
+  SkipForward,
+  type LucideIcon,
+} from "lucide-react";
 
 export const MUSCLE_LABEL: Record<Muscle, string> = {
   chest: "Chest",
@@ -119,4 +134,19 @@ export const JOB_LABEL: Record<JobKind, string> = {
   check_in_note: "Writing your check-in note",
   more_options: "Finding more meal options",
   estimate_meal: "Estimating your meal",
+};
+
+/** One glyph per kind of change Ask Coach can propose. */
+export const COACH_ACTION_ICON: Record<CoachActionKind, LucideIcon> = {
+  swap_meal: Replace,
+  log_meal: ClipboardCheck,
+  replan_meals: CalendarSync,
+  rewrite_prep_guide: ChefHat,
+  set_day_type: CalendarCog,
+  set_workout_time: Clock,
+  swap_exercise: ArrowLeftRight,
+  set_session_location: MapPin,
+  skip_session: SkipForward,
+  new_block: Dumbbell,
+  save_note: NotebookPen,
 };

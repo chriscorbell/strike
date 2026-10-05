@@ -1,5 +1,5 @@
 import type { MealMenu, PrepSession } from "@strike/core";
-import { BellRing, Check, ChefHat, ChevronRight, Lightbulb, Microwave, RefreshCw, ShieldCheck } from "lucide-react";
+import { BellRing, Check, ChefHat, ChevronRight, Lightbulb, Microwave, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -7,6 +7,8 @@ import { Link } from "react-router";
 import { WorkingGlyph } from "../../components/CoachStatus.tsx";
 import { Section } from "../../components/Page.tsx";
 import { Button } from "../../components/ui/Button.tsx";
+import { Field, TextArea } from "../../components/ui/Field.tsx";
+import { Sheet } from "../../components/ui/Sheet.tsx";
 import { Badge, EmptyState } from "../../components/ui/States.tsx";
 import { toast } from "../../components/ui/Toast.tsx";
 import { cn } from "../../lib/cn.ts";
@@ -17,12 +19,13 @@ import { keys, useServerToday, useStartJob } from "../../lib/queries.ts";
 import { cookHref, stepProgress, usePrepChecks } from "./prepState.ts";
 
 /**
- * Write or rewrite a menu's prep guide. Progress comes from `menu.prepGuidePending`, which the menu query
- * polls; a quick job can finish before the first poll, so the refetch after starting counts as writing too.
+ * Write or rewrite a menu's prep guide, from today on. Progress comes from `menu.prepGuidePending`, which the
+ * menu query polls; a quick job can finish before the first poll, so the refetch after starting counts as
+ * writing too.
  */
 function usePrepGuideJob(menu: MealMenu) {
   const qc = useQueryClient();
-  const start = useStartJob(() => endpoints.writePrepGuide(menu.id));
+  const start = useStartJob((note: string | undefined) => endpoints.writePrepGuide(menu.id, note));
   const [refreshing, setRefreshing] = useState(false);
   const [watching, setWatching] = useState(false);
   const ready = !!menu.prepGuide && !menu.prepGuideStale;
@@ -37,11 +40,13 @@ function usePrepGuideJob(menu: MealMenu) {
     toast(ready ? "Prep guide ready" : "Couldn't write the prep guide", { tone: ready ? "default" : "error" });
   }, [watching, refreshing, menu.prepGuidePending, ready]);
 
-  const write = () =>
-    start.mutate(undefined, {
+  /** `note` tells the coach what changed, e.g. a missed cook day. */
+  const write = (note?: string, opts?: { onStarted?: () => void }) =>
+    start.mutate(note?.trim() || undefined, {
       onSuccess: () => {
         setRefreshing(true);
         setWatching(true);
+        opts?.onStarted?.();
         void qc.invalidateQueries({ queryKey: keys.menu }).finally(() => setRefreshing(false));
       },
     });
@@ -53,6 +58,7 @@ export function PrepView({ menu, week }: { menu: MealMenu; week: MenuWeek }) {
   const guide = menu.prepGuide;
   const today = useServerToday();
   const job = usePrepGuideJob(menu);
+  const [redoOpen, setRedoOpen] = useState(false);
 
   const writingNote = (
     <p role="status" className="flex items-center gap-2.5 text-[15px] text-ink-2">
@@ -73,7 +79,7 @@ export function PrepView({ menu, week }: { menu: MealMenu; week: MenuWeek }) {
                 icon={ChefHat}
                 title="No prep guide yet"
                 action={
-                  <Button variant="primary" icon={ChefHat} loading={job.starting} onClick={job.write}>
+                  <Button variant="primary" icon={ChefHat} loading={job.starting} onClick={() => job.write()}>
                     Write prep guide
                   </Button>
                 }
@@ -122,7 +128,7 @@ export function PrepView({ menu, week }: { menu: MealMenu; week: MenuWeek }) {
                 <p className="min-w-0 max-w-[52ch] text-[15px] leading-relaxed text-ink-2">
                   You changed the plan after this guide was written, so some amounts may be off.
                 </p>
-                <Button icon={RefreshCw} loading={job.starting} onClick={job.write}>
+                <Button icon={RefreshCw} loading={job.starting} onClick={() => job.write()}>
                   Update guide
                 </Button>
               </>
@@ -131,7 +137,17 @@ export function PrepView({ menu, week }: { menu: MealMenu; week: MenuWeek }) {
         )}
         {!menu.prepGuideStale && job.writing && <div className="mt-6">{writingNote}</div>}
 
-        <Section title="Cooking sessions" className="mt-10">
+        <Section
+          title="Cooking sessions"
+          className="mt-10"
+          action={
+            !job.writing && (
+              <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => setRedoOpen(true)}>
+                {week === "current" ? "Redo from today" : "Rewrite"}
+              </Button>
+            )
+          }
+        >
           <motion.ul variants={listVariants} initial="initial" animate="animate" className="flex flex-col gap-3">
             {guide.sessions.map((s, i) => (
               <motion.li key={`${s.date}-${i}`} variants={itemVariants}>
@@ -191,7 +207,50 @@ export function PrepView({ menu, week }: { menu: MealMenu; week: MenuWeek }) {
         )}
         <CoachNote menu={menu} guideSource={guide.source} />
       </div>
+
+      <RedoSheet open={redoOpen} onClose={() => setRedoOpen(false)} week={week} job={job} />
     </div>
+  );
+}
+
+/** Rewrite the guide from today, with a note on what changed. */
+function RedoSheet({ open, onClose, week, job }: { open: boolean; onClose: () => void; week: MenuWeek; job: ReturnType<typeof usePrepGuideJob> }) {
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    if (open) setNote("");
+  }, [open]);
+  const submit = () => job.write(note, { onStarted: onClose });
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={week === "current" ? "Redo the guide from today" : "Rewrite the guide"}
+      description={`The coach rewrites ${week === "current" ? "the rest of the week's" : "the week's"} cooking around what changed. It takes about 8 minutes; this guide stays until then.`}
+      footer={
+        <Button variant="primary" size="lg" block icon={RotateCcw} loading={job.starting} onClick={submit}>
+          Rewrite guide
+        </Button>
+      }
+    >
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <Field label="What changed?" optional>
+          <TextArea
+            data-autofocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Missed Sunday's cook; the chicken is frozen"
+          />
+        </Field>
+      </form>
+    </Sheet>
   );
 }
 

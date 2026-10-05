@@ -68,6 +68,80 @@ final class APIClient: Sendable {
         }
     }
 
+    // MARK: Event streams
+
+    /// `GET` a server-sent event stream, decoding each event's `data` as `E`.
+    func stream<E: Decodable & Sendable>(_ path: String) async throws -> AsyncThrowingStream<E, Error> {
+        try await openStream("GET", path, body: Optional<EmptyBody>.none)
+    }
+
+    /// `POST` a body and read the answer as a server-sent event stream, decoding each event's `data` as `E`.
+    func postStream<E: Decodable & Sendable>(_ path: String, _ body: some Encodable & Sendable) async throws -> AsyncThrowingStream<E, Error> {
+        try await openStream("POST", path, body: body)
+    }
+
+    /// Throws before returning when the server answers with an error instead of a stream (401 goes
+    /// through `onUnauthorized`); afterwards, failures end the returned stream. Lines starting with `:`
+    /// are keep-alive comments, and a blank line ends an event.
+    private func openStream<E: Decodable & Sendable, B: Encodable & Sendable>(
+        _ method: String,
+        _ path: String,
+        body: B?
+    ) async throws -> AsyncThrowingStream<E, Error> {
+        var request = try makeRequest(method, path, body: body)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await session.bytes(for: request)
+        } catch {
+            throw Self.mapTransport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.transport("No HTTP response.")
+        }
+        guard (200 ..< 300).contains(http.statusCode) else {
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > 64_000 { break }
+            }
+            try check(http, data: data)
+            throw APIError.server(status: http.statusCode, message: "")
+        }
+
+        let (stream, continuation) = AsyncThrowingStream<E, Error>.makeStream()
+        let task = Task {
+            var parser = ServerSentEvents()
+            var line: [UInt8] = []
+            do {
+                // Split lines by hand: `AsyncBytes.lines` skips the blank lines that end events.
+                for try await byte in bytes {
+                    guard byte == UInt8(ascii: "\n") else {
+                        line.append(byte)
+                        continue
+                    }
+                    if line.last == UInt8(ascii: "\r") { line.removeLast() }
+                    if let data = parser.feed(String(decoding: line, as: UTF8.self)) {
+                        do {
+                            continuation.yield(try JSONDecoder().decode(E.self, from: Data(data.utf8)))
+                        } catch let error as DecodingError {
+                            throw APIError.decoding(Self.describe(error, path: path))
+                        }
+                    }
+                    line.removeAll(keepingCapacity: true)
+                }
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: Self.mapTransport(error))
+            }
+        }
+        continuation.onTermination = { _ in task.cancel() }
+        return stream
+    }
+
     // MARK: Core
 
     private func send<T: Decodable & Sendable, B: Encodable & Sendable>(
@@ -76,6 +150,34 @@ final class APIClient: Sendable {
         query: [String: String] = [:],
         body: B?
     ) async throws -> T {
+        let request = try makeRequest(method, path, query: query, body: body)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw Self.mapTransport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.transport("No HTTP response.")
+        }
+        try check(http, data: data)
+
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch let error as DecodingError {
+            throw APIError.decoding(Self.describe(error, path: path))
+        }
+    }
+
+    private func makeRequest<B: Encodable & Sendable>(
+        _ method: String,
+        _ path: String,
+        query: [String: String] = [:],
+        body: B?
+    ) throws -> URLRequest {
         guard var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
@@ -94,20 +196,11 @@ final class APIClient: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)
         }
+        return request
+    }
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError where error.code == .cancelled {
-            throw CancellationError()
-        } catch let error as URLError {
-            throw APIError.transport(Self.describe(error))
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.transport("No HTTP response.")
-        }
+    /// Throws for 401 (after telling the app) and for any other non-2xx status, with the server's message.
+    private func check(_ http: HTTPURLResponse, data: Data) throws {
         if http.statusCode == 401 {
             onUnauthorized()
             throw APIError.unauthorized
@@ -116,12 +209,13 @@ final class APIClient: Sendable {
             let body = try? JSONDecoder().decode(ErrorBody.self, from: data)
             throw APIError.server(status: http.statusCode, message: body?.message ?? "")
         }
+    }
 
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch let error as DecodingError {
-            throw APIError.decoding(Self.describe(error, path: path))
-        }
+    /// Cancellation stays a `CancellationError`; other URL errors become readable transport errors.
+    private static func mapTransport(_ error: Error) -> Error {
+        guard let urlError = error as? URLError else { return error }
+        if urlError.code == .cancelled { return CancellationError() }
+        return APIError.transport(describe(urlError))
     }
 
     /// `{ error, details? }`; for validation failures `details` holds zod issues.
@@ -167,5 +261,25 @@ final class APIClient: Sendable {
             "\(path): \(keyPath(context)) \(context.debugDescription)"
         @unknown default: "\(path): \(error.localizedDescription)"
         }
+    }
+}
+
+/// Incremental parser for `text/event-stream` lines. Returns an event's data once a blank line ends it.
+private struct ServerSentEvents {
+    private var data: [String] = []
+
+    mutating func feed(_ line: String) -> String? {
+        if line.isEmpty {
+            defer { data.removeAll() }
+            return data.isEmpty ? nil : data.joined(separator: "\n")
+        }
+        // Keep-alive comment.
+        if line.hasPrefix(":") { return nil }
+        let field = line.prefix { $0 != ":" }
+        var value = line.dropFirst(field.count).dropFirst()
+        if value.hasPrefix(" ") { value = value.dropFirst() }
+        // `event:` repeats the JSON's `type`; `id:` and `retry:` aren't used.
+        if field == "data" { data.append(String(value)) }
+        return nil
     }
 }

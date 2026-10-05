@@ -1,7 +1,7 @@
 // The week's meal-prep guide: written by the coach from a finished plan, with the exact portions the
 // plan calls for, so Chris can open it on prep day and follow it start to finish.
 import { z } from "zod";
-import { addDays, daysBetween, LocalDate, TimeOfDay, weekdayOf, type MealOption, type PrepGuide, type Profile } from "@strike/core";
+import { addDays, daysBetween, formatTime, LocalDate, minutesNowIn, TimeOfDay, weekdayOf, type MealOption, type PrepGuide, type Profile } from "@strike/core";
 import type { MenuData } from "../db/index.ts";
 import { menuRowById, planFingerprint, updateMenuData, type MenuRow } from "../services/meals.ts";
 import { requireProfile, today } from "../services/profile.ts";
@@ -33,7 +33,7 @@ function occurrences(data: MenuData, fromDate: string): Occurrence[] {
 
 const dayName = (date: string) => `${DAY[weekdayOf(date)]} ${date}`;
 
-export function prepGuidePrompt(profile: Profile, row: MenuRow, fromDate: string): string {
+export function prepGuidePrompt(profile: Profile, row: MenuRow, fromDate: string, note: string | null = null): string {
   const occ = occurrences(row.data, fromDate);
   const dishes = new Map<string, MealOption[]>();
   for (const o of occ) dishes.set(o.option.name, [...(dishes.get(o.option.name) ?? []), o.option]);
@@ -52,8 +52,9 @@ export function prepGuidePrompt(profile: Profile, row: MenuRow, fromDate: string
     `## Every planned home-cooked meal, with its exact portion\n${mealText}`,
     notes,
     "## Task",
-    `Write ${profile.name}'s meal-prep guide for these meals. Today is ${dayName(today(profile))}; the first planned meal is on ${occ[0] ? dayName(occ[0].date) : "the first day"}. They will open this on prep day and follow it step by step, so make it complete enough to cook from without looking anything up.`,
-    "- sessions: usually two cooking sessions, the first on or before the first planned day and one midweek, because cooked food keeps about four days in the fridge. Assign each meal to the session that cooks it. A day's breakfast can be cooked fresh in the morning if that's simpler; say so in a short session for it rather than leaving it out.",
+    `Write ${profile.name}'s meal-prep guide for these meals. Today is ${dayName(today(profile))}, ${formatTime(minutesNowIn(profile.timezone))} now; the first planned meal is on ${occ[0] ? dayName(occ[0].date) : "the first day"}. They will open this on prep day and follow it step by step, so make it complete enough to cook from without looking anything up.`,
+    note ? `- ${profile.name}'s situation, which overrides the defaults below: ${note}` : "",
+    "- sessions: usually two cooking sessions, the first on or before the first planned day (never before today) and one midweek, because cooked food keeps about four days in the fridge. Assign each meal to the session that cooks it. A day's breakfast can be cooked fresh in the morning if that's simpler; say so in a short session for it rather than leaving it out.",
     "- For each session: covers (which meals it produces), realistic active and total minutes, equipment (pans, sheet pans, air fryer, rice cooker, mixing bowls, containers with counts and sizes), and ingredients: everything to take out before starting, with exact totals for that session.",
     `- steps: in the order to actually do them, using every appliance in parallel and saying what to do while something cooks. Each step specific: quantities, cut sizes, pan and heat level, oven or air-fryer temperature in ${imperial ? "°F" : "°C"}, times, how to tell it's done (internal temperature for meat), cooling before packing. Put a waiting time in timerMinutes when a timer helps. Use tip for doneness checks and small tricks.`,
     "- The last steps of a session portion everything into containers. containers: one per planned meal it covers, labeled like 'Mon · Lunch', with contents and amounts exactly as planned (cooked weights where that's how they're portioned), fridge or freezer, and the date it's eaten (eatBy). Anything eaten more than four days after cooking goes in the freezer.",
@@ -178,6 +179,7 @@ export async function prepGuideHandler(input: Record<string, unknown>) {
   const profile = requireProfile();
   const row = menuRowById(Number(input.menuId));
   const fromDate = today(profile) > row.weekStart ? today(profile) : row.weekStart;
+  const note = typeof input.note === "string" && input.note ? input.note : null;
   if (!(row.data.plan ?? []).length) throw new Error("This menu has no day-by-day plan to prep from.");
   let source: "coach" | "fallback" = "fallback";
   let guide: Omit<PrepGuide, "createdAt" | "source"> | null = null;
@@ -185,7 +187,7 @@ export async function prepGuideHandler(input: Record<string, unknown>) {
   if (coachEnabled()) {
     for (let attempt = 1; attempt <= 2 && !guide; attempt++) {
       try {
-        guide = await askClaude({ label: "prep guide", system: SYSTEM, prompt: prepGuidePrompt(profile, row, fromDate), schema: GuideOut, timeoutMs: 30 * 60_000 });
+        guide = await askClaude({ label: "prep guide", system: SYSTEM, prompt: prepGuidePrompt(profile, row, fromDate, note), schema: GuideOut, timeoutMs: 30 * 60_000 });
         source = "coach";
       } catch (err) {
         reason = err instanceof Error ? err.message : String(err);

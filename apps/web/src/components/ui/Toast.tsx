@@ -35,6 +35,7 @@ export function toast(message: string, opts: { tone?: Tone; action?: ToastItem["
 
 export const toastError = (message: string) => toast(message, { tone: "error" });
 
+/** Bottom-centered stack. A page with its own bottom bar (Coach's composer) lifts it with --toast-offset. */
 export function Toaster() {
   const list = useSyncExternalStore(
     (l) => {
@@ -46,7 +47,7 @@ export function Toaster() {
   return createPortal(
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-6"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--toast-offset,5.5rem)+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-[var(--toast-offset-lg,1.5rem)]"
     >
       <AnimatePresence initial={false}>
         {list.map((t) => (

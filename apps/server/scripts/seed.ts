@@ -1,5 +1,6 @@
 // Fill a local development server with a sample profile and a few weeks of history.
-// Usage: STRIKE_URL=http://localhost:3090 node scripts/seed.ts   (against a server with an empty database)
+// Usage: STRIKE_URL=http://localhost:3090 node scripts/seed.ts   (against a server with an empty database;
+// set STRIKE_DATA_DIR to the server's when it isn't the default)
 import path from "node:path";
 import Database from "better-sqlite3";
 import { addDays, todayIn, type OnboardingRequest, type Session, type StateResponse } from "@strike/core";
@@ -86,7 +87,8 @@ for (let tries = 0; tries < 30; tries++) {
       await api("PUT", `/api/sessions/${s.id}/feedback`, { muscle: ex.muscle, soreness: 1, pump: 1, workload: 1, jointPain: false });
     }
     await api("POST", `/api/sessions/${s.id}/complete`);
-    const db = new Database(path.resolve(import.meta.dirname, "../data/strike.db"));
+    // The server's database, which is only reachable here when this runs beside it.
+    const db = new Database(path.join(process.env.STRIKE_DATA_DIR ?? path.resolve(import.meta.dirname, "../data"), "strike.db"));
     db.prepare("update sessions set date = ? where id = ?").run(addDays(today, -1), s.id);
     db.close();
     break;

@@ -1,4 +1,4 @@
-import { ChartLine, Dumbbell, House, Settings, Utensils, Zap, type LucideIcon } from "lucide-react";
+import { ChartLine, Dumbbell, House, MessageCircle, Settings, Utensils, Zap, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
@@ -10,6 +10,7 @@ import { CoachStatus } from "./CoachStatus.tsx";
 const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/", label: "Today", icon: House, end: true },
   { to: "/meals", label: "Meals", icon: Utensils },
+  { to: "/coach", label: "Coach", icon: MessageCircle },
   { to: "/progress", label: "Progress", icon: ChartLine },
   { to: "/plan", label: "Plan", icon: Dumbbell },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -91,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="Main"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/85 pb-safe backdrop-blur-xl lg:hidden"
         >
-          <ul className="mx-auto grid h-16 max-w-lg grid-cols-5">
+          <ul className="mx-auto grid h-16 max-w-lg grid-cols-6">
             {NAV.map((item) => (
               <li key={item.to}>
                 <NavLink

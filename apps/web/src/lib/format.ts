@@ -111,6 +111,22 @@ export function fmtRelativeDay(date: string, today: string): string {
 export const fmtClock = (iso: string) =>
   new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 
+/** ISO timestamp relative to now: "Just now", "12 min ago", "3 h ago", "Yesterday", "Monday", "Oct 3". */
+export function fmtAgo(iso: string, now = Date.now()): string {
+  const then = new Date(iso);
+  const minutes = Math.floor((now - then.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 12 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(new Date(now)) - startOf(then)) / 86_400_000);
+  if (days === 0) return `${Math.floor(minutes / 60)} h ago`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(then);
+  const sameYear = then.getFullYear() === new Date(now).getFullYear();
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: sameYear ? undefined : "numeric" }).format(then);
+}
+
 /** Seconds to "1:05". */
 export const fmtCountdown = (seconds: number) => {
   const s = Math.max(0, Math.ceil(seconds));

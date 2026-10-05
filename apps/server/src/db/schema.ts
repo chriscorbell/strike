@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { DayType, GroceryCatalogItem, PrepGuide, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
+import type { CoachAction, DayType, GroceryCatalogItem, PrepGuide, Location, Macros, MealMenu, MesoPlan, Muscle, NutritionTargets, Profile, Measurements, SessionStatus, JobKind } from "@strike/core";
 
 const now = () => new Date().toISOString();
 
@@ -184,6 +184,35 @@ export const coachNotes = sqliteTable("coach_notes", {
   note: text("note").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
 });
+
+/** A proposed change as stored: what clients see, plus the input it applies with. */
+export interface StoredCoachAction extends CoachAction {
+  input: Record<string, unknown>;
+}
+
+export const coachThreads = sqliteTable("coach_threads", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(now),
+  updatedAt: text("updated_at").notNull().$defaultFn(now),
+});
+
+export const coachMessages = sqliteTable(
+  "coach_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    threadId: integer("thread_id")
+      .notNull()
+      .references(() => coachThreads.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    text: text("text").notNull().default(""),
+    status: text("status", { enum: ["pending", "done", "failed"] }).notNull(),
+    error: text("error"),
+    actions: text("actions", { mode: "json" }).$type<StoredCoachAction[]>().notNull().default([]),
+    createdAt: text("created_at").notNull().$defaultFn(now),
+  },
+  (t) => [index("coach_messages_thread").on(t.threadId)],
+);
 
 export const jobs = sqliteTable(
   "jobs",

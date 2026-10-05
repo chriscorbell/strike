@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CompleteSessionResponse, ExerciseDetail, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
+import type { CoachMessage, CoachStreamEvent, CoachThread, CoachThreadSummary, CompleteSessionResponse, ExerciseDetail, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
 import { createApp } from "../src/app.ts";
+import { propose } from "../src/coach/actions.ts";
 import { registerCoachHandlers } from "../src/coach/tasks.ts";
 import { closeDb, runMigrations } from "../src/db/index.ts";
 import { env } from "../src/env.ts";
-import { pendingJobs, startWorker, stopWorker } from "../src/services/jobs.ts";
+import { recentCoachNotes } from "../src/services/checkins.ts";
+import { getJob, pendingJobs, startWorker, stopWorker } from "../src/services/jobs.ts";
 
 const app = createApp();
 const auth = { authorization: "Bearer test-token", "content-type": "application/json" };
@@ -13,6 +15,17 @@ const auth = { authorization: "Bearer test-token", "content-type": "application/
 async function call<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = auth): Promise<{ status: number; body: T }> {
   const res = await app.request(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, body: (await res.json()) as T };
+}
+
+/** Sends an Ask Coach message and reads the whole event stream. */
+async function ask(threadId: number | null, text: string): Promise<CoachStreamEvent[]> {
+  const res = await app.request("/api/coach/messages", { method: "POST", headers: auth, body: JSON.stringify({ threadId, text }) });
+  expect(res.headers.get("content-type")).toContain("text/event-stream");
+  return (await res.text())
+    .split("\n\n")
+    .map((chunk) => chunk.split("\n").find((l) => l.startsWith("data: ")))
+    .filter((l): l is string => l != null)
+    .map((l) => JSON.parse(l.slice(6)) as CoachStreamEvent);
 }
 
 async function idle() {
@@ -174,6 +187,91 @@ describe("api", () => {
 
     const today = (await call<TodayResponse>("GET", `/api/today?date=${guide.sessions[0]!.date}`)).body;
     expect(today.prep?.sessions.length).toBeGreaterThan(0);
+  });
+
+  it("answers in Ask Coach as a stream and keeps the conversation", async () => {
+    const events = await ask(null, "I missed my cook day yesterday. What now?");
+    expect(events[0]!.type).toBe("start");
+    expect(events.some((e) => e.type === "delta")).toBe(true);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("expected done last");
+    expect(done.reply.status).toBe("done");
+    expect(done.reply.text.length).toBeGreaterThan(0);
+
+    const threads = (await call<CoachThreadSummary[]>("GET", "/api/coach/threads")).body;
+    expect(threads[0]!.title).toBe("I missed my cook day yesterday. What now?");
+    const thread = (await call<CoachThread>("GET", `/api/coach/threads/${threads[0]!.id}`)).body;
+    expect(thread.replying).toBe(false);
+    expect(thread.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+
+    await ask(thread.id, "And tomorrow?");
+    expect((await call<CoachThread>("GET", `/api/coach/threads/${thread.id}`)).body.messages).toHaveLength(4);
+    expect((await call("POST", "/api/coach/messages", { threadId: 9999, text: "hi" })).status).toBe(404);
+    expect((await call("POST", "/api/coach/messages", { threadId: null, text: "   " })).status).toBe(400);
+  });
+
+  it("proposes changes that only happen when applied, all together", async () => {
+    const done = (await ask(null, "Swap tomorrow's breakfast")).at(-1)!;
+    if (done.type !== "done") throw new Error("expected done last");
+    const replyId = done.reply.id;
+    const menu = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    const day = menu.plan.at(-1)!;
+    const meal = day.meals[0]!;
+    const slot = menu.slots.find((s) => s.dayType === day.dayType && s.slotIndex === meal.slotIndex)!;
+    const other = slot.options.find((o) => o.id !== meal.optionId)!;
+
+    // Proposing checks the change but leaves everything as it was.
+    const swap = propose(replyId, "swap_meal", { date: day.date, slotIndex: meal.slotIndex, optionId: other.id });
+    expect(swap.summary).toContain(other.name);
+    expect(() => propose(replyId, "swap_meal", { date: day.date, slotIndex: meal.slotIndex, optionId: "nope" })).toThrow(/isn't on this menu/);
+    expect(() => propose(replyId, "set_day_type", { date: "2020-01-01", dayType: "rest" })).toThrow(/already passed/);
+    propose(replyId, "set_workout_time", { date: day.date, time: "07:15" });
+    propose(replyId, "save_note", { note: "Chicken for this week is in the freezer." });
+    propose(replyId, "rewrite_prep_guide", { week: "current", note: "Missed the first cook; chicken is frozen." });
+    const before = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    expect(before.plan.at(-1)!.meals[0]!.optionId).toBe(meal.optionId);
+    expect(recentCoachNotes().some((n) => n.note.includes("freezer"))).toBe(false);
+
+    const applied = await call<CoachMessage>("POST", `/api/coach/messages/${replyId}/apply`);
+    expect(applied.status).toBe(200);
+    expect(applied.body.actions.map((a) => a.status)).toEqual(["applied", "applied", "applied", "applied"]);
+    const after = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    expect(after.plan.at(-1)!.meals[0]!.optionId).toBe(other.id);
+    expect((await call<TodayResponse>("GET", `/api/today?date=${day.date}`)).body.workoutTimeOverride).toBe("07:15");
+    expect(recentCoachNotes().some((n) => n.note.includes("freezer"))).toBe(true);
+    const jobId = applied.body.actions.find((a) => a.kind === "rewrite_prep_guide")!.jobId!;
+    await idle();
+    expect(getJob(jobId).status).toBe("succeeded");
+    expect((await call("POST", `/api/coach/messages/${replyId}/apply`)).status).toBe(409);
+
+    // A later reply's proposals replace earlier ones that weren't applied.
+    const first = (await ask(null, "Make tomorrow a rest day")).at(-1)!;
+    if (first.type !== "done") throw new Error("expected done last");
+    propose(first.reply.id, "set_day_type", { date: day.date, dayType: "rest" });
+    const next = (await ask(first.reply.threadId, "Actually, the day after")).at(-1)!;
+    if (next.type !== "done") throw new Error("expected done last");
+    propose(next.reply.id, "set_workout_time", { date: day.date, time: null });
+    const replaced = (await call<CoachThread>("GET", `/api/coach/threads/${first.reply.threadId}`)).body.messages;
+    expect(replaced.find((m) => m.id === first.reply.id)!.actions[0]!.status).toBe("dismissed");
+    expect(replaced.find((m) => m.id === next.reply.id)!.actions[0]!.status).toBe("proposed");
+
+    // Dismissing leaves things alone.
+    const second = (await ask(null, "Actually, never mind")).at(-1)!;
+    if (second.type !== "done") throw new Error("expected done last");
+    propose(second.reply.id, "save_note", { note: "Never saved." });
+    const dismissed = await call<CoachMessage>("POST", `/api/coach/messages/${second.reply.id}/dismiss`);
+    expect(dismissed.body.actions[0]!.status).toBe("dismissed");
+    expect(recentCoachNotes().some((n) => n.note === "Never saved.")).toBe(false);
+    expect((await call("DELETE", `/api/coach/threads/${second.reply.threadId}`)).status).toBe(200);
+    expect((await call("GET", `/api/coach/threads/${second.reply.threadId}`)).status).toBe(404);
+  });
+
+  it("rewrites a prep guide with a note", async () => {
+    const menu = (await call<MenuResponse>("GET", "/api/menu")).body.menu!;
+    const job = await call<{ id: number; status: string }>("POST", `/api/menu/${menu.id}/prep-guide`, { note: "Cook on Tuesday instead." });
+    expect(job.status).toBe(200);
+    await idle();
+    expect(getJob(job.body.id).status).toBe("succeeded");
   });
 
   it("keeps manual weigh-ins over Apple Health", async () => {

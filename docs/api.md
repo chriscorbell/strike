@@ -79,8 +79,8 @@ Each plan week has a menu: options for every meal slot of a training day and a r
 | GET | `/api/menu?week=current\|next` | — | `MenuResponse`: the `menu`, any pending plan job, `prepAt` (when that week's plan is prepared) and `shoppingDate`. `current` (default) is this plan week; `next` is the coming week, whose `menu` is `null` until it's prepared. |
 | GET | `/api/menus/:id` | — | `MealMenu`, any week |
 | PUT | `/api/menu/:id/plan` | `{ date, slotIndex, optionId }` | `MealMenu`. Plans a different option for one meal; any option on the menu is allowed, and grab-and-go needs no groceries. |
-| POST | `/api/menu/:id/prep-guide` | — | `Job`. Writes or rewrites the menu's prep guide (one is also queued after every new plan). |
-| POST | `/api/menu/regenerate` | `{ note?, week?: "current" \| "next" }` | `Job` |
+| POST | `/api/menu/:id/prep-guide` | `{ note?: string }` (optional) | `Job`. Writes or rewrites the menu's prep guide from today on (one is also queued after every new plan). `note` tells the coach what changed, e.g. "missed Sunday's cook; the chicken is frozen". |
+| POST | `/api/menu/regenerate` | `{ note?, week?: "current" \| "next", keepGroceries?: boolean }` | `Job`. `keepGroceries` re-plans the rest of the week from the groceries its list already had you buy. |
 | POST | `/api/meals/log` | `MealLogRequest` | `MealLog`. Pick an `optionId`, or send `custom` macros, or `status: "skipped"`. Logging the same slot again replaces it. Logging doesn't change the plan. |
 | DELETE | `/api/meals/log/:id` | — | `{ ok: true }` |
 | GET | `/api/meals/history?days=14` | — | `MealHistoryDay[]`, newest first |
@@ -101,3 +101,29 @@ Each plan week has a menu: options for every meal slot of a training day and a r
 | POST | `/api/coach/note` | `{ note: string }` | `{ ok: true }`. A note for the coach ("traveling next week", "left knee is sore") used by the next plan it writes. |
 | GET | `/api/jobs?pending=1` | — | `Job[]`: pending jobs, or the 20 most recent without `pending` (failed ones included) |
 | GET | `/api/jobs/:id` | — | `Job` |
+
+### Ask Coach
+
+A conversation with the coach about anything in Strike: it reads the plan, logs and history through tools, answers, and can **propose** changes. A proposed change does nothing until it's applied: each reply's proposals appear as `CoachMessage.actions`, and `apply` makes all of them happen together, or none if one no longer fits (the reply's actions stay `proposed` and the error says why). The coach can't set loads, reps or calorie targets; those stay with the rules.
+
+| Method | Path | Body | Returns |
+| --- | --- | --- | --- |
+| GET | `/api/coach/threads` | — | `CoachThreadSummary[]`, most recently active first |
+| GET | `/api/coach/threads/:id` | — | `CoachThread`: its `messages`, oldest first, and `replying` while the coach is writing |
+| DELETE | `/api/coach/threads/:id` | — | `{ ok: true }`; `409` while the coach is replying in it |
+| POST | `/api/coach/messages` | `CoachMessageRequest`: `{ threadId: number \| null, text }` | A `text/event-stream` of `CoachStreamEvent`s (below). `threadId: null` starts a new conversation. `409` (JSON, before any stream) while the coach is still answering in that thread, or when the coach is off. |
+| GET | `/api/coach/threads/:id/stream` | — | The reply being written now, as the same event stream from its beginning (after the app lost the original stream). `409` when nothing is being written; reload the thread instead. |
+| POST | `/api/coach/messages/:id/apply` | — | `CoachMessage` with its proposed actions `applied`, and `jobId` set on those that started coach work. `409` if one can't apply now, or nothing is left to apply. |
+| POST | `/api/coach/messages/:id/dismiss` | — | `CoachMessage` with its proposed actions `dismissed` |
+
+**The event stream.** Each event is `event: <type>` and `data: <CoachStreamEvent as JSON>`. Lines starting with `:` are keep-alive comments, sent every 10 s while the coach thinks.
+
+- `start`: `{ thread, message, reply }`: the conversation, the saved message, and the reply placeholder (`status: "pending"`).
+- `status`: `{ text }`: what the coach is doing ("Thinking", "Reading the prep guide"). Show it while no text has arrived since.
+- `delta`: `{ text }`: the next piece of the reply's text. Append in order.
+- `action`: `{ action }`: a change proposed mid-reply. It's in `done` too.
+- `done`: `{ reply }`: the finished `CoachMessage`, with its text, actions and `status` `done` or `failed` (`error` says why). Always last.
+
+A reply keeps going and is saved if the client disconnects; reopening the thread shows it `replying` until it's done. Replies are plain text: short paragraphs, `- ` bullets, and occasional `**bold**`.
+
+`CoachAction`: `id`, `kind` (`swap_meal`, `log_meal`, `replan_meals`, `rewrite_prep_guide`, `set_day_type`, `set_workout_time`, `swap_exercise`, `set_session_location`, `skip_session`, `new_block`, `save_note`), `summary` (one line saying what it does), `detail` (a second line or null), `status` (`proposed`, `applied`, `dismissed`) and `jobId`.
