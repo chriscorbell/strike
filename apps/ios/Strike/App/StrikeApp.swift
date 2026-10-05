@@ -13,6 +13,7 @@ struct StrikeApp: App {
                 .environment(app.meals)
                 .environment(app.progress)
                 .environment(app.plan)
+                .environment(app.coach)
                 .preferredColorScheme(app.appearance.colorScheme)
                 .task { await app.launch() }
         }

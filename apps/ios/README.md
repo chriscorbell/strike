@@ -1,6 +1,6 @@
 # Strike for iOS
 
-The native iPhone app for Strike: today's meals and workout, set logging in the gym, meal menus, progress and the training plan. It talks to the Strike server's HTTP API ([docs/api.md](../../docs/api.md)); the Swift models in `Strike/Models` mirror `packages/core`.
+The native iPhone app for Strike: today's meals and workout, set logging in the gym, meal menus, progress, the training plan, and Ask Coach, a chat with the coach that can propose changes to apply. It talks to the Strike server's HTTP API ([docs/api.md](../../docs/api.md)); the Swift models in `Strike/Models` mirror `packages/core`.
 
 SwiftUI, iOS 26+, Swift 6 with strict concurrency, no third-party dependencies.
 

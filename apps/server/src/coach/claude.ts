@@ -8,8 +8,19 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { env } from "../env.ts";
 
-const workdir = path.join(os.tmpdir(), "strike-coach");
+export const workdir = path.join(os.tmpdir(), "strike-coach");
 fs.mkdirSync(workdir, { recursive: true });
+
+/**
+ * The SDK replaces the child's environment when `env` is set, so pass ours through. An API key would
+ * outrank the subscription token, and only the subscription is meant to be used here.
+ */
+export function childEnv(): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: `strike/${env.version}` };
+  delete out.ANTHROPIC_API_KEY;
+  delete out.ANTHROPIC_AUTH_TOKEN;
+  return out;
+}
 
 export interface StructuredRequest<T extends z.ZodType> {
   label: string;
@@ -25,11 +36,6 @@ export async function askClaude<T extends z.ZodType>(req: StructuredRequest<T>):
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), req.timeoutMs ?? 20 * 60_000);
   const started = Date.now();
-  // The SDK replaces the child's environment when `env` is set, so pass ours through. An API key
-  // would outrank the subscription token, and only the subscription is meant to be used here.
-  const childEnv: Record<string, string | undefined> = { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: `strike/${env.version}` };
-  delete childEnv.ANTHROPIC_API_KEY;
-  delete childEnv.ANTHROPIC_AUTH_TOKEN;
   try {
     let result: unknown;
     let failure: string | null = null;
@@ -45,7 +51,7 @@ export async function askClaude<T extends z.ZodType>(req: StructuredRequest<T>):
         effort: env.effort,
         outputFormat: { type: "json_schema", schema: z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown> },
         cwd: workdir,
-        env: childEnv,
+        env: childEnv(),
         abortController: abort,
       },
     })) {

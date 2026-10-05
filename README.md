@@ -9,6 +9,8 @@ After onboarding, Strike tells you each day:
 
 You log the reps you actually did, and Strike decides whether next time's weight goes up, down or stays the same. Daily weigh-ins feed a smoothed weight trend. A weekly check-in adjusts calories to keep you on pace for your goal. Claude, running on your Claude subscription, writes the training blocks, the weekly menus and the check-in notes.
 
+When plans meet real life ("I missed my cook day", "move today's workout to tomorrow"), ask the coach in the Coach tab. It reads your plan and logs, answers, and proposes changes that happen only when you tap Apply.
+
 ## How it works
 
 | Part | Where | What it does |
@@ -39,11 +41,14 @@ The server reads these environment variables (it also loads `apps/server/.env` i
 | `STRIKE_COACH` | `claude` | `claude` calls Claude. `mock` returns rule-based results instantly, for development. `off` uses rule-based results only |
 | `STRIKE_MODEL` | `claude-opus-5-5` | Model for coach requests |
 | `STRIKE_EFFORT` | `xhigh` | Reasoning effort for coach requests |
+| `STRIKE_CHAT_EFFORT` | `medium` | Reasoning effort for Ask Coach replies, kept lower so a conversation answers in seconds |
 | `CLAUDE_CODE_OAUTH_TOKEN` | unset | Subscription token from `claude setup-token`. A local `claude` login also works on a dev machine |
 | `STRIKE_DATA_DIR` | `apps/server/data` | SQLite database and backups |
 | `STRIKE_BACKUP_COPY_DIR` | unset | Second location for the daily database snapshot, such as a NAS share |
 
 To load a sample profile with three weeks of history into a fresh dev server, run `STRIKE_COACH=mock pnpm --filter @strike/server dev`, then `pnpm --filter @strike/server seed`.
+
+In mock mode, Ask Coach streams a canned reply, and a message containing "remember" also gets a proposed change, so the chat UI can be exercised without Claude. To try the real coach from the terminal against a copy of a database, run `STRIKE_DATA_DIR=<dir> node apps/server/scripts/ask.ts "question"` (add `--prompt` to print what it would send).
 
 Checks: `pnpm -r typecheck` and `pnpm -r test`.
 

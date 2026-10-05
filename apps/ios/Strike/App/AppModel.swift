@@ -72,6 +72,7 @@ final class AppModel {
     let meals = MealsStore()
     let progress = ProgressStore()
     let plan = PlanStore()
+    let coach = CoachStore()
     let healthKit = HealthKitService()
     let notifications = NotificationService()
     let cookTimers = CookTimers()
@@ -94,7 +95,7 @@ final class AppModel {
         appearance = Appearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .dark
         healthSyncEnabled = defaults.bool(forKey: Keys.health)
         notificationsEnabled = defaults.object(forKey: Keys.notifications) as? Bool ?? true
-        for store in [today, meals, progress, plan] as [any AppStore] {
+        for store in [today, meals, progress, plan, coach] as [any AppStore] {
             store.app = self
         }
         notifications.app = self
@@ -277,9 +278,10 @@ final class AppModel {
 
     // MARK: Lifecycle
 
-    /// Foreground refresh: today, Apple Health sync and notifications.
+    /// Foreground refresh: a coach reply that was streaming, today, Apple Health sync and notifications.
     func didBecomeActive() async {
         guard phase == .ready, api != nil else { return }
+        coach.resume()
         if healthSyncEnabled { await syncHealth() }
         await today.load()
     }

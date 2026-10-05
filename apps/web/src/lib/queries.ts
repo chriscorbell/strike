@@ -25,6 +25,9 @@ export const keys = {
   checkinStatus: ["checkins", "status"] as const,
   pendingJobs: ["jobs", "pending"] as const,
   job: (id: number) => ["job", id] as const,
+  /** Ask Coach. The open conversation itself lives in the Coach page, kept current by its reply stream. */
+  coach: ["coach"] as const,
+  coachThreads: ["coach", "threads"] as const,
 };
 
 // ---------- Queries ----------
@@ -93,6 +96,9 @@ export const useMealHistory = (days = 14) =>
   useQuery({ queryKey: keys.mealHistory(days), queryFn: () => endpoints.mealHistory(days) });
 export const useCheckins = () => useQuery({ queryKey: keys.checkins, queryFn: endpoints.checkins });
 export const useCheckinStatus = () => useQuery({ queryKey: keys.checkinStatus, queryFn: endpoints.checkinStatus });
+/** Ask Coach conversations, most recently active first. */
+export const useCoachThreads = (enabled = true) =>
+  useQuery({ queryKey: keys.coachThreads, queryFn: endpoints.coachThreads, enabled });
 
 // ---------- Coach jobs ----------
 
@@ -153,13 +159,13 @@ export function usePendingJobs() {
 }
 
 /** Poll a single job until it finishes. Invalidates affected queries once it succeeds. */
-export function useJob(id: number | null | undefined) {
+export function useJob(id: number | null | undefined, intervalMs = 2000) {
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: keys.job(id ?? -1),
     queryFn: () => endpoints.job(id!),
     enabled: id != null,
-    refetchInterval: (q) => (isJobDone(q.state.data) ? false : 2000),
+    refetchInterval: (q) => (isJobDone(q.state.data) ? false : intervalMs),
   });
   const handled = useRef<number | null>(null);
   useEffect(() => {

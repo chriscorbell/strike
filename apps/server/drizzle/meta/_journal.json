@@ -15,6 +15,13 @@
       "when": 1791051080805,
       "tag": "0001_planned_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791229448178,
+      "tag": "0002_coach_chat",
+      "breakpoints": true
     }
   ]
 }

@@ -501,3 +501,55 @@ export const Job = z.object({
   updatedAt: z.string(),
 });
 export type Job = z.infer<typeof Job>;
+
+// ---------- Coach chat ----------
+
+/** What a proposed change does. Each kind maps to one thing the app can already do. */
+export const CoachActionKind = z.enum([
+  "swap_meal",
+  "log_meal",
+  "replan_meals",
+  "rewrite_prep_guide",
+  "set_day_type",
+  "set_workout_time",
+  "swap_exercise",
+  "set_session_location",
+  "skip_session",
+  "new_block",
+  "save_note",
+]);
+export type CoachActionKind = z.infer<typeof CoachActionKind>;
+
+/** A change the coach proposed in a reply. Nothing happens until it's applied. */
+export const CoachAction = z.object({
+  id: z.string(),
+  kind: CoachActionKind,
+  /** One line saying what applying it does. */
+  summary: z.string(),
+  /** A second line when useful: the note passed along, or how long the coach's work takes. */
+  detail: z.string().nullable(),
+  status: z.enum(["proposed", "applied", "dismissed"]),
+  /** Once applied: the coach job it started (a re-plan, a prep guide, a block), if any. */
+  jobId: z.number().nullable(),
+});
+export type CoachAction = z.infer<typeof CoachAction>;
+
+export const CoachMessage = z.object({
+  id: z.number(),
+  threadId: z.number(),
+  role: z.enum(["user", "assistant"]),
+  text: z.string(),
+  /** A reply is pending while the coach writes it, and failed if it couldn't finish. */
+  status: z.enum(["pending", "done", "failed"]),
+  error: z.string().nullable(),
+  actions: z.array(CoachAction),
+  createdAt: z.string(),
+});
+export type CoachMessage = z.infer<typeof CoachMessage>;
+
+export const CoachMessageRequest = z.object({
+  /** null starts a new conversation. */
+  threadId: z.number().int().positive().nullable(),
+  text: z.string().trim().min(1).max(4000),
+});
+export type CoachMessageRequest = z.infer<typeof CoachMessageRequest>;

@@ -2,6 +2,9 @@
 import type {
   CheckIn,
   CheckInStatus,
+  CoachMessage,
+  CoachThread,
+  CoachThreadSummary,
   CompleteSessionResponse,
   ExerciseDetail,
   ExerciseHistoryResponse,
@@ -100,9 +103,10 @@ export const endpoints = {
   menuById: (id: number) => api<MealMenu>(`/menus/${id}`),
   regenerateMenu: (note?: string, week: MenuWeek = "current") =>
     api<Job>("/menu/regenerate", { method: "POST", body: { note, week } }),
+  /** Write (or rewrite) the menu's prep guide from today on. The note tells the coach what changed. */
+  writePrepGuide: (menuId: number, note?: string) =>
+    api<Job>(`/menu/${menuId}/prep-guide`, { method: "POST", body: note ? { note } : undefined }),
   /** Put a different option on one meal of the plan; the grocery list follows. */
-  /** Write (or rewrite) the menu's prep guide. */
-  writePrepGuide: (menuId: number) => api<Job>(`/menu/${menuId}/prep-guide`, { method: "POST" }),
   setPlanMeal: (menuId: number, body: { date: string; slotIndex: number; optionId: string }) =>
     api<MealMenu>(`/menu/${menuId}/plan`, { method: "PUT", body }),
   logMeal: (body: MealLogRequest) => api<MealLog>("/meals/log", { method: "POST", body }),
@@ -119,4 +123,12 @@ export const endpoints = {
   coachNote: (note: string) => api<{ ok: true }>("/coach/note", { method: "POST", body: { note } }),
   pendingJobs: () => api<Job[]>("/jobs?pending=1"),
   job: (id: number) => api<Job>(`/jobs/${id}`),
+
+  // Ask Coach (sending a message and following a reply stream: lib/coachStream.ts)
+  coachThreads: () => api<CoachThreadSummary[]>("/coach/threads"),
+  coachThread: (id: number) => api<CoachThread>(`/coach/threads/${id}`),
+  deleteCoachThread: (id: number) => api<{ ok: true }>(`/coach/threads/${id}`, { method: "DELETE" }),
+  /** Apply every proposed change on a reply, together. */
+  applyCoachMessage: (id: number) => api<CoachMessage>(`/coach/messages/${id}/apply`, { method: "POST" }),
+  dismissCoachMessage: (id: number) => api<CoachMessage>(`/coach/messages/${id}/dismiss`, { method: "POST" }),
 };

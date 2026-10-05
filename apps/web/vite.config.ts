@@ -4,17 +4,20 @@ import { defineConfig } from "vite";
 
 const pkg = (names: string) => new RegExp(`[\\\\/]node_modules[\\\\/](${names})[\\\\/]`);
 
+// The API server for dev and preview. STRIKE_API points elsewhere, e.g. a second server on another port.
+const api = process.env.STRIKE_API ?? "http://localhost:3090";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:3090",
+      "/api": api,
     },
   },
   preview: {
     proxy: {
-      "/api": "http://localhost:3090",
+      "/api": api,
     },
   },
   build: {

@@ -17,7 +17,7 @@ Read this index and [the protocol](protocol.md) when starting or resuming a sess
 - [`README.md`](../../README.md): setup, configuration, deployment
 - [`CONTEXT.md`](../../CONTEXT.md): domain vocabulary (block, session, RIR, plan week, slot...)
 - [`docs/api.md`](../api.md): the HTTP API contract shared by server, web and iOS
-- [`docs/adr/`](../adr/): why rules decide numbers and Claude decides content, subscription auth, Tailscale-only deployment, planning the week before the grocery trip
+- [`docs/adr/`](../adr/): why rules decide numbers and Claude decides content, subscription auth, Tailscale-only deployment, planning the week before the grocery trip, Ask Coach proposing changes that Chris applies
 - [`apps/ios/README.md`](../../apps/ios/README.md): building and installing the iPhone app
 
 ## Review record

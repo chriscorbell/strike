@@ -15,6 +15,7 @@ import { SessionPage } from "./features/workout/SessionPage.tsx";
 import { ApiError, errorMessage, getToken, isUnauthorized, onUnauthorized, setToken } from "./lib/api.ts";
 import { useAppState } from "./lib/queries.ts";
 
+const CoachPage = lazy(() => import("./features/coach/CoachPage.tsx").then((m) => ({ default: m.CoachPage })));
 const ProgressPage = lazy(() => import("./features/progress/ProgressPage.tsx").then((m) => ({ default: m.ProgressPage })));
 const OnboardingFlow = lazy(() => import("./features/onboarding/OnboardingFlow.tsx").then((m) => ({ default: m.OnboardingFlow })));
 const EditProfilePage = lazy(() =>
@@ -115,6 +116,7 @@ function Root() {
           <Route path="/sessions/:id" element={<SessionPage />} />
           <Route path="/meals" element={<MealsPage />} />
           <Route path="/meals/prep/:menuId/:session" element={<CookModePage />} />
+          <Route path="/coach" element={<CoachPage />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/settings" element={<SettingsPage />} />

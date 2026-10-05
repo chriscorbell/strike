@@ -6,4 +6,5 @@ One bullet per topic note, with a relative link and a concrete "read when" cue. 
 
 Threshold: 12 entries. Past it, the bounded review in [maintenance](../maintenance.md) samples this category first.
 
-- [Server runtime and coach timing](runtime-and-coach.md): before changing server startup, the Dockerfile, or coach prompts/timeouts
+- [Server runtime and coach timing](runtime-and-coach.md): before changing server startup, the Dockerfile, coach prompts/timeouts, or Ask Coach
+- [iOS builds on mbp](ios-builds-on-mbp.md): before building, running or screenshotting the iPhone app on this Mac

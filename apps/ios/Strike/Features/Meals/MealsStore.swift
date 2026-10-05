@@ -289,13 +289,14 @@ final class MealsStore: AppStore {
         writingGuides.contains(menu.id) || menu.prepGuidePending
     }
 
-    /// Writes or rewrites a menu's prep guide, waits for the job, then reloads.
-    func writePrepGuide(for menu: MealMenu) async {
+    /// Writes or rewrites a menu's prep guide from today on, waits for the job, then reloads. `note`
+    /// tells the coach what changed, e.g. a missed cook day.
+    func writePrepGuide(for menu: MealMenu, note: String? = nil) async {
         guard !writingGuides.contains(menu.id) else { return }
         withAnimation(Theme.spring) { _ = writingGuides.insert(menu.id) }
         defer { withAnimation(Theme.spring) { _ = writingGuides.remove(menu.id) } }
         do {
-            let job: Job = try await api.post("/api/menu/\(menu.id)/prep-guide")
+            let job: Job = try await api.post("/api/menu/\(menu.id)/prep-guide", NoteRequest(note: note))
             let done = try await api.waitForJob(job.id)
             if done.status == .failed {
                 app?.show(Toast(message: done.error ?? "The coach couldn't write the prep guide.", style: .error))

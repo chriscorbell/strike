@@ -24,4 +24,6 @@
 | **Grocery list** | The plan's home-cooked ingredients, totaled per **catalog** item (how a store sells it) and rounded to packages; **staples** are listed to check, not buy. |
 | **Slot** | One meal in a day's plan, with a time, a role (regular, pre-workout, post-workout, bedtime) and macro targets. |
 | **Coach** | Claude, called through the Agent SDK on the Claude subscription. It writes blocks, menus, extra options, meal estimates and check-in notes as background **jobs**. |
+| **Ask Coach** | A conversation with the coach in the app. It reads the plan and logs through tools, answers, and proposes changes. |
+| **Proposal** | A change the coach suggests in an Ask Coach reply (swap a meal, rewrite the prep guide, move a workout...). It does nothing until Chris applies it; a reply's proposals apply together, and a later reply's proposals replace earlier unapplied ones. |
 | **Fallback** | The rule-based planner and meal generator used when the coach is off or fails, so there is always a plan. |

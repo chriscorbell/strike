@@ -3,11 +3,13 @@ import { createApp } from "./app.ts";
 import { startBackups } from "./backup.ts";
 import { registerCoachHandlers } from "./coach/tasks.ts";
 import { closeDb, runMigrations } from "./db/index.ts";
+import { failInterruptedReplies } from "./services/coach-chat.ts";
 import { env } from "./env.ts";
 import { startScheduler, tick } from "./scheduler.ts";
 import { onJobDone, startWorker, stopWorker } from "./services/jobs.ts";
 
 runMigrations();
+failInterruptedReplies();
 registerCoachHandlers();
 // A finished job can unblock the next step, e.g. a new block or menu.
 onJobDone(() => {
