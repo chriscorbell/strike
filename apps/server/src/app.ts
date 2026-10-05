@@ -158,6 +158,7 @@ export function createApp() {
   app.post("/api/sessions/:id/complete", (c) => c.json(training.completeSession(id(c))));
   app.post("/api/sessions/:id/skip", (c) => c.json(training.skipSession(id(c))));
   app.get("/api/exercises", (c) => c.json(training.listExercises(c.req.query("logged") === "1")));
+  app.get("/api/exercises/:id", (c) => c.json(training.exerciseDetail(c.req.param("id"))));
   app.get("/api/exercises/:id/history", (c) => c.json(training.exerciseHistoryView(c.req.param("id"))));
 
   // Meals

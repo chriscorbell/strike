@@ -246,6 +246,40 @@ struct ExerciseInfo: Codable, Hashable, Identifiable, Sendable {
     var availableAt: [Location]
 }
 
+/// One exercise with its form guide and technique video.
+struct ExerciseDetail: Codable, Hashable, Identifiable, Sendable {
+    var id: String
+    var name: String
+    var primary: Muscle
+    var secondary: [Muscle]
+    var loadType: LoadType
+    var repMin: Int
+    var repMax: Int
+    var cues: String
+    var availableAt: [Location]
+    var guide: ExerciseGuide
+}
+
+struct ExerciseGuide: Codable, Hashable, Sendable {
+    /// Getting into position: equipment, grip, stance, brace.
+    var setup: [String]
+    /// One rep, start to finish.
+    var steps: [String]
+    /// The usual errors, each phrased as the fix.
+    var mistakes: [String]
+    var video: ExerciseVideo
+}
+
+struct ExerciseVideo: Codable, Hashable, Sendable {
+    var youtubeId: String
+    var title: String
+    var channel: String
+    /// Length of the whole video.
+    var seconds: Int
+    /// Where this exercise's technique starts.
+    var start: Int
+}
+
 struct ExerciseHistoryResponse: Codable, Sendable {
     struct Point: Codable, Hashable, Sendable {
         var date: LocalDate

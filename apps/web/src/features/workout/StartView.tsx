@@ -1,5 +1,5 @@
 import type { Session, SessionExercise } from "@strike/core";
-import { CalendarX, Play } from "lucide-react";
+import { CalendarX, ChevronRight, Play } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Page, Panel, Section } from "../../components/Page.tsx";
@@ -11,6 +11,7 @@ import { LOCATION_LABEL, MUSCLE_LABEL } from "../../lib/labels.ts";
 import { useProfile } from "../../lib/queries.ts";
 import { useMediaQuery } from "../../lib/useMediaQuery.ts";
 import { Dock, OverflowMenu } from "./controls.tsx";
+import { ExerciseGuideSheet, type GuideTarget } from "./ExerciseGuideSheet.tsx";
 import { SorenessPicker } from "./Feedback.tsx";
 import { feedbackFor, fmtWorkSet, musclesInOrder, orderedExercises, substitutedName, type LoadUnit } from "./lib.ts";
 import { availableLocations, locationOptions, SessionHeader, SessionMeta, SkipSheet } from "./SessionHeader.tsx";
@@ -23,6 +24,12 @@ export function StartView({ session, actions }: { session: Session; actions: Ses
   const navigate = useNavigate();
   const desktop = useMediaQuery("(min-width: 1024px)");
   const [confirmSkip, setConfirmSkip] = useState(false);
+  const [guide, setGuide] = useState<GuideTarget | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const openGuide = (se: SessionExercise) => {
+    setGuide({ exerciseId: se.exerciseId, name: se.name });
+    setGuideOpen(true);
+  };
 
   const exercises = orderedExercises(session);
   const muscles = musclesInOrder(exercises);
@@ -96,7 +103,7 @@ export function StartView({ session, actions }: { session: Session; actions: Ses
 
             {!desktop && (
               <Section title="Exercises">
-                <ExercisePreview exercises={exercises} unit={session.loadUnit} busy={relocating} />
+                <ExercisePreview exercises={exercises} unit={session.loadUnit} busy={relocating} onOpen={openGuide} />
               </Section>
             )}
           </div>
@@ -105,7 +112,7 @@ export function StartView({ session, actions }: { session: Session; actions: Ses
         {desktop && (
           <aside aria-label="Exercises" className="sticky top-10 flex flex-col gap-4">
             <h2 className="text-[17px] font-semibold tracking-tight text-ink">Exercises</h2>
-            <ExercisePreview exercises={exercises} unit={session.loadUnit} busy={relocating} />
+            <ExercisePreview exercises={exercises} unit={session.loadUnit} busy={relocating} onOpen={openGuide} />
             {startButton}
           </aside>
         )}
@@ -116,6 +123,8 @@ export function StartView({ session, actions }: { session: Session; actions: Ses
           {startButton}
         </Dock>
       )}
+
+      <ExerciseGuideSheet target={guide} open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       <SkipSheet
         open={confirmSkip}
@@ -128,24 +137,43 @@ export function StartView({ session, actions }: { session: Session; actions: Ses
   );
 }
 
-function ExercisePreview({ exercises, unit, busy }: { exercises: SessionExercise[]; unit: LoadUnit; busy: boolean }) {
+interface ExercisePreviewProps {
+  exercises: SessionExercise[];
+  unit: LoadUnit;
+  busy: boolean;
+  onOpen: (se: SessionExercise) => void;
+}
+
+function ExercisePreview({ exercises, unit, busy, onOpen }: ExercisePreviewProps) {
   return (
-    <Panel className={cn("transition-opacity duration-200", busy && "opacity-50")}>
+    <Panel className={cn("overflow-hidden transition-opacity duration-200", busy && "opacity-50")}>
       <ol className="divide-y divide-line" aria-busy={busy || undefined}>
         {exercises.map((se, i) => {
           const first = se.sets[0];
           const swapped = substitutedName(se);
           return (
-            <li key={se.id} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
-              <span className="w-4 shrink-0 pt-px text-sm text-ink-3 tnum">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-medium leading-snug text-ink">{se.name}</p>
-                <p className="mt-0.5 text-[13px] text-ink-3 tnum">
-                  {se.sets.length} {se.sets.length === 1 ? "set" : "sets"}
-                  {first && ` · ${fmtWorkSet(first.targetWeight, first.targetReps, unit, se.loadType === "bodyweight")}`}
-                </p>
-                {swapped && <p className="mt-0.5 text-[13px] text-ink-3">Swapped from {swapped}</p>}
-              </div>
+            <li key={se.id}>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => onOpen(se)}
+                className="group flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-raised sm:px-5"
+              >
+                <span className="w-4 shrink-0 pt-px text-sm text-ink-3 tnum">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium leading-snug text-ink">{se.name}</span>
+                  <span className="mt-0.5 block text-[13px] text-ink-3 tnum">
+                    {se.sets.length} {se.sets.length === 1 ? "set" : "sets"}
+                    {first && ` · ${fmtWorkSet(first.targetWeight, first.targetReps, unit, se.loadType === "bodyweight")}`}
+                  </span>
+                  {swapped && <span className="mt-0.5 block text-[13px] text-ink-3">Swapped from {swapped}</span>}
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="mt-0.5 shrink-0 self-center text-ink-3 transition-transform duration-200 group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </button>
             </li>
           );
         })}

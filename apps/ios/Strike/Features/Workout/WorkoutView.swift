@@ -6,6 +6,7 @@ struct WorkoutView: View {
     @Environment(AppModel.self) private var app
 
     @State private var swapTarget: SessionExercise?
+    @State private var guideTarget: SessionExercise?
     @State private var confirmFinish = false
     @State private var confirmFinishBottom = false
     @State private var confirmSkip = false
@@ -41,6 +42,9 @@ struct WorkoutView: View {
         }
         .sheet(item: $swapTarget) { exercise in
             SwapExerciseSheet(store: store, exercise: exercise)
+        }
+        .sheet(item: $guideTarget) { exercise in
+            ExerciseGuideSheet(store: store, exercise: exercise)
         }
         .confirmationDialog("Skip this session?", isPresented: $confirmSkip, titleVisibility: .visible) {
             Button("Skip session", role: .destructive) {
@@ -154,9 +158,12 @@ struct WorkoutView: View {
                 VStack(spacing: 16) {
                     WorkoutHeader(store: store, session: session)
                     ForEach(store.orderedExercises) { exercise in
-                        ExerciseCard(store: store, exercise: exercise) {
-                            swapTarget = exercise
-                        }
+                        ExerciseCard(
+                            store: store,
+                            exercise: exercise,
+                            onSwap: { swapTarget = exercise },
+                            onGuide: { guideTarget = exercise }
+                        )
                         .id("exercise-\(exercise.id)")
                     }
                     if session.status == .inProgress {

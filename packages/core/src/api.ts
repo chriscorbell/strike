@@ -1,5 +1,6 @@
 // Response shapes for the HTTP API. Requests are validated with the zod schemas in schemas.ts;
 // responses are plain types. docs/api.md documents both, and the iOS models mirror them.
+import type { ExerciseGuide } from "./exercise-guides.ts";
 import type {
   CheckIn,
   DayType,
@@ -162,6 +163,11 @@ export interface ExerciseInfo {
   repMax: number;
   cues: string;
   availableAt: Location[];
+}
+
+/** One exercise with its form guide and technique video. */
+export interface ExerciseDetail extends ExerciseInfo {
+  guide: ExerciseGuide;
 }
 
 export interface ExerciseHistoryResponse {

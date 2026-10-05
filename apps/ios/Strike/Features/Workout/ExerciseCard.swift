@@ -5,6 +5,8 @@ struct ExerciseCard: View {
     var store: WorkoutStore
     var exercise: SessionExercise
     var onSwap: () -> Void
+    /// Opens the form guide.
+    var onGuide: () -> Void
 
     @State private var showCues = false
 
@@ -60,9 +62,17 @@ struct ExerciseCard: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(exercise.name)
-                    .font(.title3.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onGuide) {
+                    // A no-break space keeps the chevron with the last word.
+                    Text("\(exercise.name)\u{00A0}\(Text(Image(systemName: "chevron.forward")).font(.subheadline.weight(.semibold)).foregroundStyle(.tertiary))")
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(exercise.name)
+                .accessibilityHint("Shows how to do it, with a video")
                 Text("\(exercise.muscle.displayName) · \(exercise.loadType.displayName) · \(exercise.repMin)–\(exercise.repMax) reps")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -70,6 +80,7 @@ struct ExerciseCard: View {
             Spacer(minLength: 8)
             if !isDone {
                 Menu {
+                    Button("How to do it", systemImage: "play.rectangle", action: onGuide)
                     if store.canSwap(exercise) {
                         Button("Swap exercise", systemImage: "arrow.triangle.2.circlepath", action: onSwap)
                     }

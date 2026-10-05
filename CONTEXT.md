@@ -10,6 +10,7 @@
 | **RIR** | Reps in reserve: how many more reps were possible. Targets fall from 3 to 0 across a block; 4 on the deload. |
 | **e1RM** | Estimated one-rep max from a set: `weight × (1 + (reps + RIR) / 30)`. |
 | **Prescription** | The load and reps for each set of a session exercise, decided by the progression engine from the last time that exercise was done. |
+| **Form guide** | How to do one library exercise: setup, the rep step by step, common mistakes, and one YouTube technique video. Opened by tapping an exercise on a workout day. |
 | **Feedback** | Per muscle per session: soreness, pump, workload, joint pain. It adds or removes sets on the same day next week. |
 | **Targets** | Daily calories and macros for training days and rest days, with the maintenance estimate behind them. Versioned by effective date. |
 | **Trend weight** | Exponentially smoothed daily weigh-ins (10% per weigh-in). Its 14-day slope is the measured rate of change. |

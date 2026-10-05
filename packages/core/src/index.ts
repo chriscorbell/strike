@@ -3,6 +3,7 @@ export * from "./api.ts";
 export * from "./units.ts";
 export * from "./dates.ts";
 export * from "./exercises.ts";
+export * from "./exercise-guides.ts";
 export * from "./equipment.ts";
 export * from "./nutrition.ts";
 export * from "./trend.ts";

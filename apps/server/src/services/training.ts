@@ -5,6 +5,7 @@ import {
   e1rm,
   EXERCISES,
   getExercise,
+  getExerciseGuide,
   isAvailable,
   loadOptions,
   loadUnit,
@@ -17,6 +18,7 @@ import {
   snapDown,
   startingWeight,
   type CompleteSessionResponse,
+  type ExerciseDetail,
   type ExerciseHistoryResponse,
   type ExerciseInfo,
   type HistoryEntry,
@@ -392,6 +394,12 @@ export function exerciseInfo(id: string, profile: Profile | null = null): Exerci
   const e = requireExercise(id);
   const availableAt: Location[] = profile ? (["home", "gym"] as const).filter((l) => isAvailable(e, profile.equipment[l])) : [];
   return { id: e.id, name: e.name, primary: e.primary, secondary: e.secondary, loadType: e.loadType, repMin: e.repMin, repMax: e.repMax, cues: e.cues, availableAt };
+}
+
+export function exerciseDetail(id: string): ExerciseDetail {
+  const guide = getExerciseGuide(id);
+  if (!getExercise(id) || !guide) throw notFound("Exercise");
+  return { ...exerciseInfo(id, requireProfile()), guide };
 }
 
 export function listExercises(loggedOnly = false): ExerciseInfo[] {

@@ -3,6 +3,7 @@ import type {
   CheckIn,
   CheckInStatus,
   CompleteSessionResponse,
+  ExerciseDetail,
   ExerciseHistoryResponse,
   ExerciseInfo,
   Job,
@@ -91,6 +92,7 @@ export const endpoints = {
   exercises: () => api<ExerciseInfo[]>("/exercises"),
   /** Only exercises with logged sets. */
   loggedExercises: () => api<ExerciseInfo[]>("/exercises?logged=1"),
+  exercise: (id: string) => api<ExerciseDetail>(`/exercises/${encodeURIComponent(id)}`),
   exerciseHistory: (id: string) => api<ExerciseHistoryResponse>(`/exercises/${encodeURIComponent(id)}/history`),
 
   // Meals

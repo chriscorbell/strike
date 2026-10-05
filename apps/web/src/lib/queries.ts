@@ -15,6 +15,7 @@ export const keys = {
   alternatives: (sessionId: number, seId: number) => ["alternatives", sessionId, seId] as const,
   exercises: ["exercises"] as const,
   loggedExercises: ["exercises", "logged"] as const,
+  exercise: (id: string) => ["exercise", id] as const,
   exerciseHistory: (id: string) => ["exerciseHistory", id] as const,
   menu: ["menu"] as const,
   menuWeek: (week: MenuWeek) => ["menu", week] as const,
@@ -64,6 +65,9 @@ export const useSession = (id: number) =>
 export const useExercises = () =>
   useQuery({ queryKey: keys.exercises, queryFn: endpoints.exercises, staleTime: 60 * 60_000 });
 export const useLoggedExercises = () => useQuery({ queryKey: keys.loggedExercises, queryFn: endpoints.loggedExercises });
+/** Form guide and video. The library is static, so it never goes stale. */
+export const useExercise = (id: string | null) =>
+  useQuery({ queryKey: keys.exercise(id ?? ""), queryFn: () => endpoints.exercise(id!), enabled: !!id, staleTime: Infinity });
 export const useExerciseHistory = (id: string | null) =>
   useQuery({
     queryKey: keys.exerciseHistory(id ?? ""),
