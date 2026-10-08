@@ -3,7 +3,7 @@
 Read when: `pnpm install` fails with ERR_PNPM_IGNORED_BUILDS or "node-gyp: command not found", or when adding a dependency with an install script.
 Status: verified
 Scope: workspace install, local and CI/Docker
-Verified: 2026-10-03
+Verified: 2026-10-07
 Source: `pnpm-workspace.yaml`; observed with pnpm 12.6.0 on mbp
 Recheck when: pnpm or better-sqlite3 major version changes
 

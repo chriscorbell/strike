@@ -22,4 +22,4 @@ Read this index and [the protocol](protocol.md) when starting or resuming a sess
 
 ## Review record
 
-2026-10-03: ordinary review. No notes existed before this session; the three written this session ([runtime and coach](context/runtime-and-coach.md), [pnpm 12 native builds](lessons/pnpm12-native-builds.md), [Strike v1 build](work/2026-10-03-strike-v1-build-a7k2.md)) were reconciled by the task itself, so nothing else was sampled. Next cursor: start of `context/`.
+2026-10-07: ordinary review after moving Strike to HTTPS behind Tailscale Serve. Sampled from the start of `context/`: [runtime and coach](context/runtime-and-coach.md) retained (checked: the Dockerfile still keeps the workspace layout and runs `node src/index.ts`; timings not rechecked, date unchanged); [iOS builds on mbp](context/ios-builds-on-mbp.md) retained and re-dated (checked: still no Simulator runtime, iPhone paired and installable); [pnpm 12 native builds](lessons/pnpm12-native-builds.md) retained and re-dated (checked: `allowBuilds` still lists `better-sqlite3: false`, `esbuild: true`). `work/` has no notes. Next cursor: start of `context/`.
