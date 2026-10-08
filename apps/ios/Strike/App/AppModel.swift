@@ -33,7 +33,13 @@ final class AppModel {
         }
     }
 
-    static let defaultServerURL = "http://minicore.tail047de3.ts.net:3090"
+    static let defaultServerURL = "https://minicore.saanen-monitor.ts.net:3090"
+    /// Addresses the server had before it moved to HTTPS behind Tailscale Serve (2026-10-07). A saved
+    /// one is replaced with the default on launch; nothing answers at them any more.
+    private static let retiredServerURLs = [
+        "http://minicore.tail047de3.ts.net:3090",
+        "http://minicore.saanen-monitor.ts.net:3090",
+    ]
 
     private(set) var phase: Phase = .launching
     private(set) var serverURL: String
@@ -90,7 +96,12 @@ final class AppModel {
     }
 
     init() {
-        serverURL = defaults.string(forKey: Keys.serverURL) ?? ""
+        var savedURL = defaults.string(forKey: Keys.serverURL) ?? ""
+        if Self.retiredServerURLs.contains(Self.normalize(savedURL)) {
+            savedURL = Self.defaultServerURL
+            defaults.set(savedURL, forKey: Keys.serverURL)
+        }
+        serverURL = savedURL
         token = Keychain.read(Keys.token) ?? ""
         appearance = Appearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .dark
         healthSyncEnabled = defaults.bool(forKey: Keys.health)
@@ -229,7 +240,7 @@ final class AppModel {
 
     static func normalize(_ raw: String) -> String {
         var url = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !url.isEmpty, !url.contains("://") { url = "http://" + url }
+        if !url.isEmpty, !url.contains("://") { url = "https://" + url }
         while url.hasSuffix("/") { url.removeLast() }
         return url
     }

@@ -56,7 +56,7 @@ After changing `apps/server/src/db/schema.ts`, run `pnpm --filter @strike/server
 
 ## Deployment
 
-Every push to `main` triggers CI (`.github/workflows/ci.yml`), which publishes `ghcr.io/chriscorbell/strike:latest`. On minicore, the Compose stack in the fleet repo (`hosts/minicore/stacks/strike`) runs that image with its data in `/home/chris/docker/data/strike`, and Watchtower restarts the container when a new image lands. The app is reached over Tailscale at `http://minicore.tail047de3.ts.net:3090` ([ADR 0003](docs/adr/0003-tailscale-only-single-user.md)). The stack's untracked `.env` holds `STRIKE_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`.
+Every push to `main` triggers CI (`.github/workflows/ci.yml`), which publishes `ghcr.io/chriscorbell/strike:latest`. On minicore, the Compose stack in the fleet repo (`hosts/minicore/stacks/strike`) runs that image with its data in `/home/chris/docker/data/strike`, and Watchtower restarts the container when a new image lands. The container publishes port 3090 on minicore's loopback only, and Tailscale Serve gives it HTTPS on the tailnet at `https://minicore.saanen-monitor.ts.net:3090` ([ADR 0003](docs/adr/0003-tailscale-only-single-user.md); the setup is `docs/tailscale-https-for-apps.md` in the fleet repo). The stack's untracked `.env` holds `STRIKE_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## iPhone app
 
