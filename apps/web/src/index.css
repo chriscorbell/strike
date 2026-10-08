@@ -4,7 +4,8 @@
   Strike design tokens. Dark only.
   Shape rule: surfaces are rounded-2xl (16px), buttons and inputs rounded-xl (12px),
   chips, segmented items and badges are rounded-full.
-  One accent (lime) for primary actions, progress and calories. Macro colors are data colors only.
+  One accent (orange, the iOS AccentColor in dark mode) for primary actions, progress and calories. Macro colors are data colors only.
+  Content on a filled accent uses dark accent-ink, not white as on iOS: white on this orange is under 3:1.
 */
 @theme {
   --color-*: initial;
@@ -22,9 +23,9 @@
   --color-ink-2: #a6a7ad;
   --color-ink-3: #8b8c93;
 
-  --color-accent: #c6e35f;
-  --color-accent-ink: #15170f;
-  --color-accent-soft: rgb(198 227 95 / 0.12);
+  --color-accent: #ff7241;
+  --color-accent-ink: #1c0d07;
+  --color-accent-soft: rgb(255 114 65 / 0.12);
 
   --color-protein: #3987e5;
   --color-carbs: #c98500;
@@ -65,7 +66,7 @@
     min-height: 100dvh;
   }
   ::selection {
-    background: rgb(198 227 95 / 0.3);
+    background: rgb(255 114 65 / 0.3);
   }
   :focus-visible {
     outline: 2px solid var(--color-accent);
