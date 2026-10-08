@@ -72,7 +72,7 @@ struct ConnectView: View {
                 Text("Server")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
-                TextField("http://host:3090", text: $url)
+                TextField("https://host:3090", text: $url)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)

@@ -47,10 +47,6 @@ targets:
         NSHealthUpdateUsageDescription: Strike saves your finished lifting sessions to Apple Health as strength training workouts.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-          NSExceptionDomains:
-            ts.net:
-              NSIncludesSubdomains: true
-              NSExceptionAllowsInsecureHTTPLoads: true
     entitlements:
       path: Config/Strike.entitlements
       properties:

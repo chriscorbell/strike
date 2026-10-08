@@ -35,7 +35,7 @@ Or open `Strike.xcodeproj` in Xcode and run the Strike scheme on a simulator. A 
 
 On first launch, enter the server URL and access token:
 
-- Server: `http://minicore.tail047de3.ts.net:3090`. Plain HTTP is only allowed for `*.ts.net` and local addresses, and the server is only reachable with Tailscale on.
+- Server: `https://minicore.saanen-monitor.ts.net:3090` (the default). It's only reachable with Tailscale on. Plain HTTP is only allowed for local addresses, such as a dev server.
 - Token: the server's `STRIKE_TOKEN`. It's stored in the Keychain. If the server rejects it, the app returns to this screen.
 
 Change either later in Settings (the person icon on each tab).
