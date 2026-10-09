@@ -23,6 +23,7 @@ import type {
   MuscleFeedback,
   OnboardingRequest,
   Profile,
+  RecentMeal,
   Session,
   SessionSummary,
   StateResponse,
@@ -112,6 +113,8 @@ export const endpoints = {
   logMeal: (body: MealLogRequest) => api<MealLog>("/meals/log", { method: "POST", body }),
   deleteMealLog: (id: number) => api<{ ok: true }>(`/meals/log/${id}`, { method: "DELETE" }),
   mealHistory: (days = 14) => api<MealHistoryDay[]>(`/meals/history${q({ days })}`),
+  /** Meals entered by hand before, most recently eaten first, to log again. */
+  recentMeals: () => api<RecentMeal[]>("/meals/recent"),
   estimateMeal: (description: string) => api<Job>("/meals/estimate", { method: "POST", body: { description } }),
   moreOptions: (date: string, slotIndex: number) =>
     api<Job>("/meals/more-options", { method: "POST", body: { date, slotIndex } }),

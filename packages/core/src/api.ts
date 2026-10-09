@@ -198,6 +198,15 @@ export interface MealHistoryDay {
   logs: MealLog[];
 }
 
+/** A meal entered by hand before (described or typed in, not picked from the plan), to log again. */
+export interface RecentMeal {
+  name: string;
+  /** From the latest time it was logged. */
+  macros: Macros;
+  /** The latest day it was logged. */
+  lastDate: string;
+}
+
 export interface CoachThreadSummary {
   id: number;
   /** The start of the first message. */

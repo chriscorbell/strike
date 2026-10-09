@@ -21,6 +21,7 @@ export const keys = {
   menuWeek: (week: MenuWeek) => ["menu", week] as const,
   menuById: (id: number) => ["menu", "id", id] as const,
   mealHistory: (days?: number) => (days ? (["mealHistory", days] as const) : (["mealHistory"] as const)),
+  recentMeals: ["recentMeals"] as const,
   checkins: ["checkins"] as const,
   checkinStatus: ["checkins", "status"] as const,
   pendingJobs: ["jobs", "pending"] as const,
@@ -94,6 +95,7 @@ export const useMenuById = (id: number) =>
   });
 export const useMealHistory = (days = 14) =>
   useQuery({ queryKey: keys.mealHistory(days), queryFn: () => endpoints.mealHistory(days) });
+export const useRecentMeals = () => useQuery({ queryKey: keys.recentMeals, queryFn: endpoints.recentMeals });
 export const useCheckins = () => useQuery({ queryKey: keys.checkins, queryFn: endpoints.checkins });
 export const useCheckinStatus = () => useQuery({ queryKey: keys.checkinStatus, queryFn: endpoints.checkinStatus });
 /** Ask Coach conversations, most recently active first. */

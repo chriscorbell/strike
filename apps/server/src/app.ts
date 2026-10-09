@@ -29,7 +29,7 @@ import { HttpError } from "./http.ts";
 import { addCoachNote, checkInDue, latestCheckIn, listCheckIns, runCheckIn } from "./services/checkins.ts";
 import { deleteThread, listThreads, threadView } from "./services/coach-chat.ts";
 import { enqueue, getJob, pendingJobRows, pendingJobs, recentJobs, toJob } from "./services/jobs.ts";
-import { deleteMealLog, logMeal, mealHistory, menuRowById, menuRowFor, menuRowForWeek, planWeekStart, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
+import { deleteMealLog, logMeal, mealHistory, menuRowById, menuRowFor, menuRowForWeek, planWeekStart, recentMeals, setDayOverride, setPlannedOption, toMenu } from "./services/meals.ts";
 import { addMeasurements, onboard, state, updateProfile } from "./services/onboarding.ts";
 import { requireProfile, today } from "./services/profile.ts";
 import { dayView } from "./services/today.ts";
@@ -211,6 +211,7 @@ export function createApp() {
     return c.json({ ok: true });
   });
   app.get("/api/meals/history", (c) => c.json(mealHistory(Math.min(90, Math.max(1, Number(c.req.query("days") ?? 14) || 14)))));
+  app.get("/api/meals/recent", (c) => c.json(recentMeals(Math.min(200, Math.max(1, Number(c.req.query("limit") ?? 50) || 50)))));
   app.post("/api/meals/estimate", json(z.object({ description: z.string().min(2).max(1000) })), (c) => c.json(enqueue("estimate_meal", { description: c.req.valid("json").description })));
   app.post("/api/meals/more-options", json(z.object({ date: LocalDate, slotIndex: z.number().int().min(0) })), (c) => c.json(enqueue("more_options", c.req.valid("json"))));
 

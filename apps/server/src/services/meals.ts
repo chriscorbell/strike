@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import {
   addDays,
   computeGroceries,
@@ -17,6 +17,7 @@ import {
   type MenuSlot,
   type PlannedMeal,
   type Profile,
+  type RecentMeal,
 } from "@strike/core";
 import { db, schema, type MenuData } from "../db/index.ts";
 import { pendingJobRows } from "./jobs.ts";
@@ -253,6 +254,23 @@ export function mealHistory(days: number): MealHistoryDay[] {
     out.push({ date: d, dayType, targets: targets[dayType], consumed: sumMacros(logs.filter((l) => l.status === "eaten").map((l) => l.macros)), logs });
   }
   return out;
+}
+
+/** Meals entered by hand, most recently eaten first, one per name (ignoring case) with its latest macros. */
+export function recentMeals(limit: number): RecentMeal[] {
+  const rows = db
+    .select()
+    .from(schema.mealLogs)
+    .where(and(isNull(schema.mealLogs.optionId), eq(schema.mealLogs.status, "eaten")))
+    .orderBy(desc(schema.mealLogs.date), desc(schema.mealLogs.loggedAt))
+    .all();
+  const byName = new Map<string, RecentMeal>();
+  for (const r of rows) {
+    const key = r.name.trim().toLowerCase();
+    if (!byName.has(key)) byName.set(key, { name: r.name, macros: r.macros, lastDate: r.date });
+    if (byName.size >= limit) break;
+  }
+  return [...byName.values()];
 }
 
 /** Recent eating, for the coach: which options got picked and what was eaten off-plan. */

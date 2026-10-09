@@ -84,6 +84,7 @@ Each plan week has a menu: options for every meal slot of a training day and a r
 | POST | `/api/meals/log` | `MealLogRequest` | `MealLog`. Pick an `optionId`, or send `custom` macros, or `status: "skipped"`. Logging the same slot again replaces it. Logging doesn't change the plan. |
 | DELETE | `/api/meals/log/:id` | — | `{ ok: true }` |
 | GET | `/api/meals/history?days=14` | — | `MealHistoryDay[]`, newest first |
+| GET | `/api/meals/recent?limit=50` | — | `RecentMeal[]`: `{ name, macros, lastDate }` for meals logged with `custom` macros, most recently eaten first, one per name (ignoring case) with the latest macros. For logging the same thing again. |
 | POST | `/api/meals/estimate` | `{ description: string }` | `Job`; its `result` is `{ name, macros }` for "what I actually ate" logging |
 | POST | `/api/meals/more-options` | `{ date, slotIndex }` | `Job`; its `result` is `MealOption[]`, also added to that week's menu slot (plan one with `PUT /api/menu/:id/plan`) |
 

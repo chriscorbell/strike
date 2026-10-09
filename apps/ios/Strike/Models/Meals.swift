@@ -250,3 +250,14 @@ struct MealEstimate: Codable, Hashable, Sendable {
     var name: String
     var macros: Macros
 }
+
+/// A meal entered by hand before (described or typed in, not picked from the plan), to log again.
+struct RecentMeal: Codable, Hashable, Identifiable, Sendable {
+    var name: String
+    /// From the latest time it was logged.
+    var macros: Macros
+    /// The latest day it was logged.
+    var lastDate: LocalDate
+
+    var id: String { name.lowercased() }
+}

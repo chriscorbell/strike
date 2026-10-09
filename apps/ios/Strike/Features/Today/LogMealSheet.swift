@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "Something else": describe what you ate and let the coach estimate it, or enter the macros.
+/// "Something else": pick a meal entered before, describe what you ate and let the coach estimate it, or enter the macros.
 struct LogMealSheet: View {
     /// Nil logs a meal outside the plan's slots.
     var slotIndex: Int?
@@ -9,13 +9,18 @@ struct LogMealSheet: View {
     @Environment(TodayStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    private enum Mode: String, CaseIterable, Identifiable {
-        case describe = "Describe it"
-        case macros = "Enter macros"
-        var id: String { rawValue }
+    private enum Mode: CaseIterable, Identifiable {
+        case recent, describe, macros
+        var id: Self { self }
     }
 
-    @State private var mode: Mode = .describe
+    /// Past this many recent meals, a search field filters them.
+    private static let searchFrom = 7
+
+    /// Nil until chosen: past meals when there are any, otherwise describing.
+    @State private var chosenMode: Mode?
+    @State private var search = ""
+    @State private var fromRecent = false
     @State private var description = ""
     @State private var estimating = false
     @State private var estimateError: String?
@@ -29,19 +34,61 @@ struct LogMealSheet: View {
     @State private var saving = false
     @FocusState private var focused: Bool
 
+    private var recent: [RecentMeal] { store.recentMeals }
+
+    private var mode: Mode { chosenMode ?? (recent.isEmpty ? .describe : .recent) }
+
+    private var modes: [Mode] { recent.isEmpty ? [.describe, .macros] : Mode.allCases }
+
+    private func label(_ mode: Mode) -> String {
+        switch mode {
+        case .recent: "Recent"
+        case .describe: "Describe it"
+        case .macros: recent.isEmpty ? "Enter macros" : "Macros"
+        }
+    }
+
+    private var matches: [RecentMeal] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty ? recent : recent.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    /// The macro form is on screen, so there's something to log.
+    private var showsForm: Bool { mode == .macros || (mode == .describe && estimated) }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Mode", selection: $mode) {
-                        ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+                    Picker("Mode", selection: Binding(get: { mode }, set: { chosenMode = $0 })) {
+                        ForEach(modes) { Text(label($0)).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 }
 
-                if mode == .describe && !estimated {
+                if mode == .recent {
+                    if recent.count >= Self.searchFrom {
+                        Section {
+                            Label {
+                                TextField("Search past meals", text: $search)
+                                    .autocorrectionDisabled()
+                            } icon: {
+                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    Section {
+                        ForEach(matches) { meal in
+                            Button { pick(meal) } label: { RecentMealRow(meal: meal) }
+                        }
+                    } footer: {
+                        if matches.isEmpty {
+                            Text("Nothing matches “\(search.trimmingCharacters(in: .whitespaces))”")
+                        }
+                    }
+                } else if mode == .describe && !estimated {
                     Section {
                         TextField("e.g. Chipotle chicken bowl, white rice, black beans, no cheese", text: $description, axis: .vertical)
                             .lineLimit(3 ... 6)
@@ -83,6 +130,8 @@ struct LogMealSheet: View {
                     } footer: {
                         if kcal.isEmpty, computedKcal > 0 {
                             Text("Calories from macros: \(Fmt.integer(computedKcal)) kcal")
+                        } else if fromRecent {
+                            Text("Same as last time. Change anything that's different.")
                         }
                     }
                     if estimated {
@@ -100,7 +149,7 @@ struct LogMealSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", systemImage: "xmark") { dismiss() }
                 }
-                if mode == .macros || estimated {
+                if showsForm {
                     ToolbarItem(placement: .confirmationAction) {
                         Button {
                             Task { await save() }
@@ -113,7 +162,7 @@ struct LogMealSheet: View {
             }
             .animation(Theme.spring, value: mode)
             .animation(Theme.spring, value: estimated)
-            .onAppear { focused = true }
+            .onAppear { focused = mode == .describe }
         }
         .presentationDetents([.medium, .large])
     }
@@ -162,15 +211,27 @@ struct LogMealSheet: View {
         defer { estimating = false }
         do {
             let result = try await store.estimate(description.trimmingCharacters(in: .whitespacesAndNewlines))
-            name = result.name
-            kcal = Fmt.integer(result.macros.kcal).replacingOccurrences(of: ",", with: "")
-            protein = Fmt.integer(result.macros.proteinG)
-            carbs = Fmt.integer(result.macros.carbsG)
-            fat = Fmt.integer(result.macros.fatG)
+            fill(name: result.name, macros: result.macros)
+            fromRecent = false
             withAnimation { estimated = true }
         } catch {
             estimateError = error.localizedDescription
         }
+    }
+
+    private func fill(name: String, macros: Macros) {
+        self.name = name
+        kcal = Fmt.integer(macros.kcal).replacingOccurrences(of: ",", with: "")
+        protein = Fmt.integer(macros.proteinG)
+        carbs = Fmt.integer(macros.carbsG)
+        fat = Fmt.integer(macros.fatG)
+    }
+
+    private func pick(_ meal: RecentMeal) {
+        fill(name: meal.name, macros: meal.macros)
+        fromRecent = true
+        estimated = false
+        withAnimation { chosenMode = .macros }
     }
 
     private func save() async {
@@ -178,5 +239,29 @@ struct LogMealSheet: View {
         await store.logCustom(name: name.trimmingCharacters(in: .whitespaces), macros: macros, slotIndex: slotIndex)
         saving = false
         dismiss()
+    }
+}
+
+
+/// A meal entered before: name, macros and the last day it was eaten.
+private struct RecentMealRow: View {
+    var meal: RecentMeal
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(meal.name)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                MacroLine(macros: meal.macros)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Text(Dates.relative(meal.lastDate))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
     }
 }
