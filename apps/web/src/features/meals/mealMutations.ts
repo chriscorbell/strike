@@ -79,6 +79,7 @@ export function useLogMeal() {
     onSettled: (_d, _e, req) => {
       void qc.invalidateQueries({ queryKey: keys.today(req.date) });
       void qc.invalidateQueries({ queryKey: keys.mealHistory() });
+      void qc.invalidateQueries({ queryKey: keys.recentMeals });
     },
   });
 }
@@ -99,6 +100,7 @@ export function useDeleteMealLog(date: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.today(date) });
       void qc.invalidateQueries({ queryKey: keys.mealHistory() });
+      void qc.invalidateQueries({ queryKey: keys.recentMeals });
     },
   });
 }

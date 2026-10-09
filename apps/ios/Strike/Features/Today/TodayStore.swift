@@ -15,6 +15,8 @@ final class TodayStore: AppStore {
     private(set) var busySlots: Set<Int> = []
     /// Slots waiting on a "more options" coach job.
     private(set) var optionJobSlots: Set<Int> = []
+    /// Meals entered by hand before, most recently eaten first, for logging again.
+    private(set) var recentMeals: [RecentMeal] = []
     private(set) var isChangingDay = false
     /// The day on screen; nil follows today.
     private(set) var selectedDate: LocalDate?
@@ -47,6 +49,7 @@ final class TodayStore: AppStore {
             let response: TodayResponse = try await api.get("/api/today", query: selectedDate.map { ["date": $0] } ?? [:])
             apply(response)
             loadError = nil
+            Task { await refreshRecentMeals() }
         } catch is CancellationError {
         } catch {
             if data == nil {
@@ -75,6 +78,11 @@ final class TodayStore: AppStore {
         await logMeal(slotIndex: slotIndex, request: MealLogRequest(
             date: date, slotIndex: slotIndex, optionId: nil, custom: .init(name: name, macros: macros), status: .eaten
         ))
+    }
+
+    private func refreshRecentMeals() async {
+        guard let recent: [RecentMeal] = try? await api.get("/api/meals/recent") else { return }
+        recentMeals = recent
     }
 
     func skip(_ meal: TimelineMeal) async {

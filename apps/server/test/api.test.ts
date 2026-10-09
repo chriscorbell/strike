@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CoachMessage, CoachStreamEvent, CoachThread, CoachThreadSummary, CompleteSessionResponse, ExerciseDetail, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
+import type { CoachMessage, CoachStreamEvent, CoachThread, CoachThreadSummary, CompleteSessionResponse, ExerciseDetail, MealMenu, MenuResponse, MesoOverview, OnboardingRequest, RecentMeal, Session, StateResponse, TodayResponse, WeightsResponse } from "@strike/core";
+import { addDays } from "@strike/core";
 import { createApp } from "../src/app.ts";
 import { propose } from "../src/coach/actions.ts";
 import { registerCoachHandlers } from "../src/coach/tasks.ts";
@@ -132,6 +133,20 @@ describe("api", () => {
     expect(log.status).toBe(200);
     const after = (await call<TodayResponse>("GET", "/api/today")).body;
     expect(after.consumed.kcal).toBeGreaterThan(0);
+  });
+
+  it("lists meals entered by hand to log again", async () => {
+    const date = (await call<TodayResponse>("GET", "/api/today")).body.date;
+    const extra = (name: string, kcal: number, day = date) =>
+      call("POST", "/api/meals/log", { date: day, slotIndex: null, optionId: null, custom: { name, macros: { kcal, proteinG: 30, carbsG: 40, fatG: 10 } }, status: "eaten" });
+    await extra("Protein shake", 300, addDays(date, -2));
+    await extra("Chipotle bowl", 800, addDays(date, -1));
+    await extra("protein shake", 320);
+    // The plan option logged earlier isn't listed; the shake is listed once, as last entered.
+    const recent = (await call<RecentMeal[]>("GET", "/api/meals/recent")).body;
+    expect(recent.map((m) => m.name)).toEqual(["protein shake", "Chipotle bowl"]);
+    expect(recent[0]).toMatchObject({ macros: { kcal: 320 }, lastDate: date });
+    expect((await call<RecentMeal[]>("GET", "/api/meals/recent?limit=1")).body).toHaveLength(1);
   });
 
   it("plans each day's meals and totals the groceries", async () => {
